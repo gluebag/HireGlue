@@ -1,0 +1,8 @@
+name: HireGlue
+php: '8.4'
+secured: true
+aliases:
+    - hireglue.test
+    - hireglue
+integrations:
+    forge: {  }
