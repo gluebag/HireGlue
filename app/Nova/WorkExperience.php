@@ -33,7 +33,9 @@ class WorkExperience extends Resource
      * @var array
      */
     public static $search = [
-        'id', 'company_name', 'position'
+        'id',
+        'company_name',
+        'position'
     ];
 
     /**
@@ -47,7 +49,10 @@ class WorkExperience extends Resource
         return [
             ID::make()->sortable(),
 
-            BelongsTo::make('User'),
+            BelongsTo::make('User')
+                ->default($request->user()->id)
+                ->withoutTrashed()
+                ->searchable(),
 
             Text::make('Company Name')
                 ->sortable()

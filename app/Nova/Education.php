@@ -47,7 +47,10 @@ class Education extends Resource
         return [
             ID::make()->sortable(),
 
-            BelongsTo::make('User'),
+            BelongsTo::make('User')
+                ->default($request->user()->id)
+                ->withoutTrashed()
+                ->searchable(),
 
             Text::make('Institution')
                 ->sortable()

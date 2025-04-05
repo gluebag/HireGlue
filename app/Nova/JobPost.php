@@ -2,7 +2,12 @@
 
 namespace App\Nova;
 
+use App\Nova\Repeaters\EducationItem;
+use App\Nova\Repeaters\ExperienceItem;
+use App\Nova\Repeaters\SkillItem;
 use Laravel\Nova\Fields\ID;
+use Laravel\Nova\Fields\KeyValue;
+use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Fields\BelongsTo;
@@ -36,13 +41,15 @@ class JobPost extends Resource
      * @var array
      */
     public static $search = [
-        'id', 'company_name', 'job_title',
+        'id',
+        'company_name',
+        'job_title',
     ];
 
     /**
      * Get the fields displayed by the resource.
      *
-     * @param  \Laravel\Nova\Http\Requests\NovaRequest  $request
+     * @param \Laravel\Nova\Http\Requests\NovaRequest $request
      * @return array
      */
     public function fields(NovaRequest $request)
@@ -50,7 +57,10 @@ class JobPost extends Resource
         return [
             ID::make()->sortable(),
 
-            BelongsTo::make('User'),
+            BelongsTo::make('User')
+                ->default($request->user()->id)
+                ->withoutTrashed()
+                ->searchable(),
 
             Text::make('Company Name')
                 ->sortable()
@@ -62,6 +72,38 @@ class JobPost extends Resource
 
             Textarea::make('Job Description')
                 ->rules('required')
+                ->hideFromIndex(),
+
+            Repeater::make('Required Education')
+                ->repeatables([
+                    EducationItem::make()
+                ])
+                ->asJson()
+                ->nullable()
+                ->hideFromIndex(),
+
+            Repeater::make('Required Experience')
+                ->repeatables([
+                    ExperienceItem::make()
+                ])
+                ->asJson()
+                ->nullable()
+                ->hideFromIndex(),
+
+            Repeater::make('Required Skills')
+                ->repeatables([
+                    SkillItem::make()
+                ])
+                ->asJson()
+                ->nullable()
+                ->hideFromIndex(),
+
+            Repeater::make('Preferred Skills')
+                ->repeatables([
+                    SkillItem::make()
+                ])
+                ->asJson()
+                ->nullable()
                 ->hideFromIndex(),
 
             Text::make('Job Post URL')
@@ -186,7 +228,7 @@ class JobPost extends Resource
     /**
      * Get the actions available for the resource.
      *
-     * @param  \Laravel\Nova\Http\Requests\NovaRequest  $request
+     * @param \Laravel\Nova\Http\Requests\NovaRequest $request
      * @return array
      */
     public function actions(NovaRequest $request)

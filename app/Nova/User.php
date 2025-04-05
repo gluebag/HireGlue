@@ -29,7 +29,23 @@ class User extends Resource
      *
      * @var string
      */
-    public static $title = 'name';
+    public static $title = 'id';
+
+    /**
+     * Get the value that should be displayed to represent the resource.
+     *
+     * @return \Stringable|string
+     */
+    public function title()
+    {
+        // return full name aka first name + last name
+        return $this->first_name . ' ' . $this->last_name;
+    }
+
+    public function subtitle()
+    {
+        return $this->email;
+    }
 
     /**
      * Get the displayable label of the resource.

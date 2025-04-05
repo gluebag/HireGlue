@@ -53,7 +53,8 @@ class Resume extends Resource
      * @var array
      */
     public static $search = [
-        'id', 'content'
+        'id',
+        'content'
     ];
 
     /**
@@ -67,8 +68,11 @@ class Resume extends Resource
         return [
             ID::make()->sortable(),
 
-            BelongsTo::make('User'),
-            
+            BelongsTo::make('User')
+                ->default($request->user()->id)
+                ->withoutTrashed()
+                ->searchable(),
+
             BelongsTo::make('Job Post', 'jobPost', JobPost::class),
 
             Textarea::make('Content')

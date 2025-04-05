@@ -31,7 +31,9 @@ class Skill extends Resource
      * @var array
      */
     public static $search = [
-        'id', 'name', 'type'
+        'id',
+        'name',
+        'type'
     ];
 
     /**
@@ -45,7 +47,10 @@ class Skill extends Resource
         return [
             ID::make()->sortable(),
 
-            BelongsTo::make('User'),
+            BelongsTo::make('User')
+                ->default($request->user()->id)
+                ->withoutTrashed()
+                ->searchable(),
 
             Text::make('Name')
                 ->sortable()

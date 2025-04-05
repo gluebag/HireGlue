@@ -32,7 +32,9 @@ class Project extends Resource
      * @var array
      */
     public static $search = [
-        'id', 'name', 'description'
+        'id',
+        'name',
+        'description'
     ];
 
     /**
@@ -46,8 +48,11 @@ class Project extends Resource
         return [
             ID::make()->sortable(),
 
-            BelongsTo::make('User'),
-
+            BelongsTo::make('User')
+                ->default($request->user()->id)
+                ->withoutTrashed()
+                ->searchable(),
+                
             Text::make('Name')
                 ->sortable()
                 ->rules('required', 'max:255'),

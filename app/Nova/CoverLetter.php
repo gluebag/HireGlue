@@ -52,7 +52,8 @@ class CoverLetter extends Resource
      * @var array
      */
     public static $search = [
-        'id', 'content'
+        'id',
+        'content'
     ];
 
     /**
@@ -66,8 +67,11 @@ class CoverLetter extends Resource
         return [
             ID::make()->sortable(),
 
-            BelongsTo::make('User'),
-            
+            BelongsTo::make('User')
+                ->default($request->user()->id)
+                ->withoutTrashed()
+                ->searchable(),
+
             BelongsTo::make('Job Post', 'jobPost', JobPost::class),
 
             Textarea::make('Content')
