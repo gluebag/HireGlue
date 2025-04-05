@@ -583,7 +583,7 @@ tailored to specific job postings.
     - [ ] Resume PDF blade template
     - [ ] Cover letter PDF blade template
 
-## 9. Controllers & Routes
+## 9. Controllers & Routes (SKIP: since we're using Nova, we'll leverage )
 
 - [ ] Create controllers:
     - [ ] JobPostController
