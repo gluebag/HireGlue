@@ -42,7 +42,7 @@ class GenerationService
         $user = $jobPost->user;
         
         // Generate content with OpenAI
-        $result = $this->openAI->generateResume($jobPost, $user);
+        $result = $this->openAI->generateResume($jobPost, $user, null, []);
         
         // Validate against rules
         $compliance = $this->rules->validateContent(

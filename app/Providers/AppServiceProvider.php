@@ -2,11 +2,14 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\ParallelTesting;
 use Illuminate\Support\ServiceProvider;
 use App\Services\RulesService;
 use App\Services\OpenAIService;
 use App\Services\PDFService;
 use App\Services\GenerationService;
+use PHPUnit\Framework\TestCase;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -15,8 +18,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-
-        
         $this->app->singleton(GenerationService::class, function ($app) {
             return new GenerationService(
                 $app->make(OpenAIService::class),
@@ -31,6 +32,25 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        ParallelTesting::setUpProcess(function (int $token) {
+            // ...
+        });
+
+        ParallelTesting::setUpTestCase(function (int $token, TestCase $testCase) {
+            // ...
+        });
+
+        // Executed when a test database is created...
+        ParallelTesting::setUpTestDatabase(function (string $database, int $token) {
+            Artisan::call('db:seed');
+        });
+
+        ParallelTesting::tearDownTestCase(function (int $token, TestCase $testCase) {
+            // ...
+        });
+
+        ParallelTesting::tearDownProcess(function (int $token) {
+            // ...
+        });
     }
 }

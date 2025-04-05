@@ -13,12 +13,12 @@ use Exception;
 class OpenAIService
 {
     protected $rulesService;
-    
+
     public function __construct(RulesService $rulesService)
     {
         $this->rulesService = $rulesService;
     }
-    
+
     /**
      * Generate a resume based on job post and user data
      *
@@ -29,21 +29,21 @@ class OpenAIService
      * @return array
      * @throws Exception
      */
-    public function generateResume(JobPost $jobPost, User $user, string $promptName = null, array $extraContext = [])
+    public function generateResume(JobPost $jobPost, User $user, ?string $promptName = null, array $extraContext = [])
     {
         $promptName = $promptName ?? 'resume_generation';
         $prompt = $this->getPrompt($promptName);
-        
+
         if (!$prompt) {
             throw new Exception("Prompt not found: {$promptName}");
         }
-        
+
         // Prepare context data
         $jobData = $this->prepareJobData($jobPost);
         $userData = $this->prepareUserData($user);
         $rules = $this->rulesService->getAllRules('resume');
         $rulesText = $this->prepareRulesText($rules);
-        
+
         // Replace placeholders in the prompt template
         $finalPrompt = $this->replacePlaceholders($prompt->prompt_template, [
             'job_data' => $jobData,
@@ -51,19 +51,19 @@ class OpenAIService
             'rules' => $rulesText,
             'job_post' => $jobPost->toArray()
         ]);
-        
+
         // Add feedback for regeneration if available
         if (!empty($extraContext['feedback'])) {
             $finalPrompt .= "\n\nFeedback for improvement:\n" . $extraContext['feedback'];
-            
+
             if (!empty($extraContext['previous_content'])) {
                 $finalPrompt .= "\n\nPrevious version:\n" . $extraContext['previous_content'];
             }
         }
-        
+
         // Call OpenAI API
         $result = $this->callOpenAI($prompt->model, $finalPrompt, $prompt->max_tokens, $prompt->temperature);
-        
+
         // Return generated content
         return [
             'content' => $result->choices[0]->message->content,
@@ -75,7 +75,7 @@ class OpenAIService
             ],
         ];
     }
-    
+
     /**
      * Generate a cover letter based on job post and user data
      *
@@ -86,21 +86,21 @@ class OpenAIService
      * @return array
      * @throws Exception
      */
-    public function generateCoverLetter(JobPost $jobPost, User $user, string $promptName = null, array $extraContext = [])
+    public function generateCoverLetter(JobPost $jobPost, User $user, ?string $promptName = null, array $extraContext = [])
     {
         $promptName = $promptName ?? 'cover_letter_generation';
         $prompt = $this->getPrompt($promptName);
-        
+
         if (!$prompt) {
             throw new Exception("Prompt not found: {$promptName}");
         }
-        
+
         // Prepare context data
         $jobData = $this->prepareJobData($jobPost);
         $userData = $this->prepareUserData($user);
         $rules = $this->rulesService->getAllRules('cover_letter');
         $rulesText = $this->prepareRulesText($rules);
-        
+
         // Replace placeholders in the prompt template
         $finalPrompt = $this->replacePlaceholders($prompt->prompt_template, [
             'job_data' => $jobData,
@@ -108,19 +108,19 @@ class OpenAIService
             'rules' => $rulesText,
             'job_post' => $jobPost->toArray()
         ]);
-        
+
         // Add feedback for regeneration if available
         if (!empty($extraContext['feedback'])) {
             $finalPrompt .= "\n\nFeedback for improvement:\n" . $extraContext['feedback'];
-            
+
             if (!empty($extraContext['previous_content'])) {
                 $finalPrompt .= "\n\nPrevious version:\n" . $extraContext['previous_content'];
             }
         }
-        
+
         // Call OpenAI API
         $result = $this->callOpenAI($prompt->model, $finalPrompt, $prompt->max_tokens, $prompt->temperature);
-        
+
         // Return generated content
         return [
             'content' => $result->choices[0]->message->content,
@@ -132,7 +132,7 @@ class OpenAIService
             ],
         ];
     }
-    
+
     /**
      * Check if content follows specific rules using OpenAI
      *
@@ -145,23 +145,23 @@ class OpenAIService
     public function checkRuleCompliance(string $content, string $type, $rules)
     {
         $prompt = $this->getPrompt('rule_compliance_check');
-        
+
         if (!$prompt) {
             throw new Exception("Prompt not found: rule_compliance_check");
         }
-        
+
         $rulesText = $this->prepareRulesText($rules);
-        
+
         // Replace placeholders in the prompt template
         $finalPrompt = $this->replacePlaceholders($prompt->prompt_template, [
             'document_content' => $content,
             'document_type' => $type,
             'rules' => $rulesText,
         ]);
-        
+
         // Call OpenAI API with lower temperature for more deterministic response
         $result = $this->callOpenAI($prompt->model, $finalPrompt, $prompt->max_tokens, 0.3);
-        
+
         // Parse the response to extract rule compliance results
         return [
             'analysis' => $result->choices[0]->message->content,
@@ -172,7 +172,7 @@ class OpenAIService
             ],
         ];
     }
-    
+
     /**
      * Get a prompt by name
      *
@@ -185,7 +185,7 @@ class OpenAIService
             ->where('active', true)
             ->first();
     }
-    
+
     /**
      * Prepare job data for the prompt
      *
@@ -202,30 +202,42 @@ class OpenAIService
             "Position Level: {$jobPost->position_level}",
             "Job Type: {$jobPost->job_type}",
         ];
-        
+
         // Add required skills if available
         if (!empty($jobPost->required_skills)) {
+            if(is_string($jobPost->required_skills)) {
+                $jobPost->required_skills = json_decode($jobPost->required_skills, true);
+            }
             $data[] = "Required Skills: " . implode(", ", $jobPost->required_skills);
         }
-        
+
         // Add preferred skills if available
         if (!empty($jobPost->preferred_skills)) {
+            if(is_string($jobPost->preferred_skills)) {
+                $jobPost->preferred_skills = json_decode($jobPost->preferred_skills, true);
+            }
             $data[] = "Preferred Skills: " . implode(", ", $jobPost->preferred_skills);
         }
-        
+
         // Add required experience if available
         if (!empty($jobPost->required_experience)) {
+            if(is_string($jobPost->required_experience)) {
+                $jobPost->required_experience = json_decode($jobPost->required_experience, true);
+            }
             $data[] = "Required Experience: " . implode(", ", $jobPost->required_experience);
         }
-        
+
         // Add required education if available
         if (!empty($jobPost->required_education)) {
+            if(is_string($jobPost->required_education)) {
+                $jobPost->required_education = json_decode($jobPost->required_education, true);
+            }
             $data[] = "Required Education: " . implode(", ", $jobPost->required_education);
         }
-        
+
         return implode("\n", $data);
     }
-    
+
     /**
      * Prepare user data for the prompt
      *
@@ -240,36 +252,36 @@ class OpenAIService
             "Phone: {$user->phone_number}",
             "Location: {$user->location}",
         ];
-        
+
         // Add LinkedIn URL if available
         if (!empty($user->linkedin_url)) {
             $data[] = "LinkedIn: {$user->linkedin_url}";
         }
-        
+
         // Add GitHub URL if available
         if (!empty($user->github_url)) {
             $data[] = "GitHub: {$user->github_url}";
         }
-        
+
         // Add personal website URL if available
         if (!empty($user->personal_website_url)) {
             $data[] = "Website: {$user->personal_website_url}";
         }
-        
+
         // Add portfolio URL if available
         if (!empty($user->portfolio_url)) {
             $data[] = "Portfolio: {$user->portfolio_url}";
         }
-        
+
         // Add work experiences
         $data[] = "\nWork Experience:";
         $workExperiences = $user->workExperiences()->orderBy('start_date', 'desc')->get();
-        
+
         foreach ($workExperiences as $exp) {
             $endDate = $exp->current_job ? "Present" : $exp->end_date->format('M Y');
             $data[] = "- {$exp->position} at {$exp->company_name} ({$exp->start_date->format('M Y')} - {$endDate})";
             $data[] = "  {$exp->description}";
-            
+
             if (!empty($exp->achievements)) {
                 $data[] = "  Achievements:";
                 foreach ($exp->achievements as $achievement => $description) {
@@ -277,16 +289,16 @@ class OpenAIService
                 }
             }
         }
-        
+
         // Add education
         $data[] = "\nEducation:";
         $education = $user->education()->orderBy('start_date', 'desc')->get();
-        
+
         foreach ($education as $edu) {
             $endDate = $edu->current ? "Present" : $edu->end_date->format('M Y');
             $fieldOfStudy = !empty($edu->field_of_study) ? " in {$edu->field_of_study}" : "";
             $data[] = "- {$edu->degree}{$fieldOfStudy} from {$edu->institution} ({$edu->start_date->format('M Y')} - {$endDate})";
-            
+
             if (!empty($edu->achievements)) {
                 $data[] = "  Achievements:";
                 foreach ($edu->achievements as $achievement => $description) {
@@ -294,37 +306,37 @@ class OpenAIService
                 }
             }
         }
-        
+
         // Add skills
         $data[] = "\nSkills:";
         $skills = $user->skills()->orderBy('proficiency', 'desc')->get();
-        
+
         foreach ($skills as $skill) {
             $experience = $skill->years_experience > 0 ? " ({$skill->years_experience} years)" : "";
             $data[] = "- {$skill->name}{$experience}";
         }
-        
+
         // Add projects
         $data[] = "\nProjects:";
         $projects = $user->projects()->get();
-        
+
         foreach ($projects as $project) {
             $data[] = "- {$project->name}";
             $data[] = "  {$project->description}";
-            
+
             if (!empty($project->technologies_used)) {
                 $techs = implode(", ", array_keys($project->technologies_used));
                 $data[] = "  Technologies: {$techs}";
             }
-            
+
             if (!empty($project->url)) {
                 $data[] = "  URL: {$project->url}";
             }
         }
-        
+
         return implode("\n", $data);
     }
-    
+
     /**
      * Prepare rules text for the prompt
      *
@@ -334,17 +346,17 @@ class OpenAIService
     protected function prepareRulesText($rules)
     {
         $rulesText = [];
-        
+
         foreach ($rules as $rule) {
             $rulesText[] = "Rule: {$rule->name}";
             $rulesText[] = "Description: {$rule->description}";
             $rulesText[] = "Importance: {$rule->importance}/10";
             $rulesText[] = ""; // Empty line between rules
         }
-        
+
         return implode("\n", $rulesText);
     }
-    
+
     /**
      * Replace placeholders in prompt template
      *
@@ -355,7 +367,7 @@ class OpenAIService
     protected function replacePlaceholders(string $template, array $replacements)
     {
         $result = $template;
-        
+
         foreach ($replacements as $key => $value) {
             if (is_array($value)) {
                 // Handle nested arrays by replacing dot notation placeholders
@@ -364,10 +376,10 @@ class OpenAIService
                 $result = str_replace("{{" . $key . "}}", $value, $result);
             }
         }
-        
+
         return $result;
     }
-    
+
     /**
      * Replace array placeholders in dot notation
      *
@@ -379,7 +391,7 @@ class OpenAIService
     {
         foreach ($array as $key => $value) {
             $placeholder = "{{" . $prefix . "." . $key . "}}";
-            
+
             if (is_array($value)) {
                 $this->replaceArrayPlaceholders($template, $prefix . "." . $key, $value);
             } else {
@@ -387,7 +399,7 @@ class OpenAIService
             }
         }
     }
-    
+
     /**
      * Call OpenAI API
      *
