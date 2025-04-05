@@ -1,0 +1,97 @@
+---
+description: HireGlue project-specific guidelines and patterns
+globs: **/*
+alwaysApply: true
+---
+
+# HireGlue Project Guidelines
+
+## Project Overview
+
+HireGlue is a Laravel 12 + Nova application designed to automate the generation of job-specific resumes and cover
+letters. The application uses OpenAI's API and a rule-based engine to ensure high-quality, ATS-optimized outputs.
+
+## Project Structure
+
+- Follow Laravel 12 directory structure
+- Use resource-oriented architecture (Users, JobPosts, Resumes, CoverLetters)
+- Store generated PDFs in the `storage/app/public/resumes` and `storage/app/public/cover_letters` directories
+- Keep OpenAI integration code in `app/Services/OpenAIService.php`
+- Implement rule engine in `app/Services/RuleEngineService.php`
+
+## Core Components
+
+### User Management
+
+- Single user system (for now)
+- Store minimal profile data needed for resume/cover letter generation
+- Include professional information (LinkedIn, GitHub, portfolio links)
+
+### Job Post Management
+
+- Store comprehensive job details (title, company, description, skills, etc.)
+- Parse job posts to extract required and preferred skills
+- Store metadata for resume/cover letter generation
+
+### Resume Generation
+
+- Implement in `app/Services/ResumeGenerationService.php`
+- Follow best practices from analyzed YouTube videos
+- Store generated content in the database and filesystem
+- Generate PDF using DomPDF or similar library
+
+### Cover Letter Generation
+
+- Implement in `app/Services/CoverLetterGenerationService.php`
+- Include compelling hooks based on company research
+- Ensure ATS optimization through keywords
+- Focus on demonstrating fit for the position
+
+### Rules Engine
+
+- Implement rule-based validation for generated content
+- Each rule should have an associated OpenAI validation method
+- Score generated content against rules
+- Allow regeneration for low-scoring content
+
+### OpenAI Integration
+
+- Use the OpenAI PHP client
+- Implement custom assistant creation for specialized generation
+- Use threads for contextual generation
+- Leverage embeddings for better semantic matching
+- Implement proper error handling and retry mechanisms
+
+## Coding Standards
+
+- Use PHP 8.2+ features (typed properties, match expressions, etc.)
+- Follow PSR-12 coding standards
+- Implement strict typing: `declare(strict_types=1);`
+- Use dependency injection via Laravel's Service Container
+- Write descriptive variable and method names
+- Implement comprehensive error handling
+
+## Performance Considerations
+
+- Cache expensive OpenAI operations
+- Queue generation jobs for background processing
+- Optimize database queries with indexes and eager loading
+- Implement proper pagination for job posts listing
+
+## Security Best Practices
+
+- Securely store OpenAI API keys
+- Validate all user input
+- Implement proper authentication
+- Use database transactions for data integrity
+- Follow OWASP security guidelines
+
+## Feature Roadmap
+
+1. User profile setup
+2. Job post management
+3. Rules engine implementation
+4. Resume generation and PDF export
+5. Cover letter generation and PDF export
+6. Quality validation and scoring
+7. Iterative improvement

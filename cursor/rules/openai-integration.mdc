@@ -1,0 +1,328 @@
+---
+description: Guidelines for OpenAI API integration in the HireGlue project
+globs: app/Services/OpenAI*.php
+alwaysApply: true
+---
+
+# OpenAI Integration Guidelines
+
+## Service Structure
+
+```php
+namespace App\Services;
+
+use OpenAI;
+use App\Models\Rule;
+use App\Models\JobPost;
+use App\Models\User;
+
+class OpenAIService
+{
+    protected $client;
+
+    public function __construct()
+    {
+        $this->client = OpenAI::client(config('services.openai.api_key'));
+    }
+
+    // Service methods...
+}
+```
+
+## Basic Chat Completion
+
+```php
+public function generateContent(string $prompt, array $options = [])
+{
+    $defaultOptions = [
+        'model' => 'gpt-4',
+        'max_tokens' => 1500,
+        'temperature' => 0.7,
+    ];
+
+    $options = array_merge($defaultOptions, $options);
+
+    $response = $this->client->chat()->create([
+        'model' => $options['model'],
+        'messages' => [
+            ['role' => 'system', 'content' => 'You are an expert resume and cover letter writer.'],
+            ['role' => 'user', 'content' => $prompt],
+        ],
+        'max_tokens' => $options['max_tokens'],
+        'temperature' => $options['temperature'],
+    ]);
+
+    return $response->choices[0]->message->content;
+}
+```
+
+## Assistants API Usage
+
+```php
+public function createAssistant(string $name, string $instructions)
+{
+    $assistant = $this->client->assistants()->create([
+        'name' => $name,
+        'instructions' => $instructions,
+        'model' => 'gpt-4',
+        'tools' => [
+            ['type' => 'retrieval'],
+        ],
+    ]);
+
+    return $assistant->id;
+}
+
+public function createThread()
+{
+    $thread = $this->client->threads()->create([]);
+
+    return $thread->id;
+}
+
+public function addMessage(string $threadId, string $content, array $files = [])
+{
+    $message = $this->client->threads()->messages()->create($threadId, [
+        'role' => 'user',
+        'content' => $content,
+        'file_ids' => $files,
+    ]);
+
+    return $message->id;
+}
+
+public function runAssistant(string $threadId, string $assistantId, string $instructions = '')
+{
+    $run = $this->client->threads()->runs()->create($threadId, [
+        'assistant_id' => $assistantId,
+        'instructions' => $instructions,
+    ]);
+
+    return $run->id;
+}
+
+public function getRunStatus(string $threadId, string $runId)
+{
+    $run = $this->client->threads()->runs()->retrieve($threadId, $runId);
+
+    return $run->status;
+}
+
+public function getMessages(string $threadId)
+{
+    $messages = $this->client->threads()->messages()->list($threadId);
+
+    return $messages;
+}
+```
+
+## Resume Generation Specific Methods
+
+```php
+public function generateResume(JobPost $jobPost, User $user, array $rules)
+{
+    // Create an assistant specifically for resume generation
+    $assistantId = $this->createAssistant(
+        'Resume Generator',
+        'You are an expert resume writer. Your task is to create a professional, ATS-optimized resume.'
+    );
+
+    // Create a thread for this generation
+    $threadId = $this->createThread();
+
+    // Add job post details to the thread
+    $this->addMessage($threadId, "Job Post: \n" . json_encode($jobPost->toArray()));
+
+    // Add user details to the thread
+    $this->addMessage($threadId, "User Profile: \n" . json_encode($user->toArray()));
+
+    // Add rules to follow
+    $rulesContent = "Rules to follow:\n";
+    foreach ($rules as $rule) {
+        $rulesContent .= "- {$rule->name}: {$rule->description}\n";
+    }
+    $this->addMessage($threadId, $rulesContent);
+
+    // Run the assistant
+    $runId = $this->runAssistant($threadId, $assistantId);
+
+    // Poll for completion (in real implementation, use queues)
+    while (true) {
+        $status = $this->getRunStatus($threadId, $runId);
+        if (in_array($status, ['completed', 'failed', 'cancelled'])) {
+            break;
+        }
+        sleep(1);
+    }
+
+    // Get the generated resume
+    $messages = $this->getMessages($threadId);
+
+    // Return the last assistant message
+    foreach ($messages->data as $message) {
+        if ($message->role === 'assistant') {
+            return $message->content[0]->text->value;
+        }
+    }
+
+    return null;
+}
+```
+
+## Rule Validation Methods
+
+```php
+public function validateAgainstRule(string $content, Rule $rule)
+{
+    // Different validation approaches based on rule type
+    if ($rule->api_call_type === 'chat') {
+        return $this->validateWithChatCompletion($content, $rule);
+    } elseif ($rule->api_call_type === 'assistant') {
+        return $this->validateWithAssistant($content, $rule);
+    } elseif ($rule->api_call_type === 'embedding') {
+        return $this->validateWithEmbeddings($content, $rule);
+    }
+
+    return $this->validateWithDefaultMethod($content, $rule);
+}
+
+protected function validateWithChatCompletion(string $content, Rule $rule)
+{
+    $prompt = str_replace('{{content}}', $content, $rule->prompt_template);
+
+    $response = $this->client->chat()->create([
+        'model' => $rule->model_name ?? 'gpt-4',
+        'messages' => [
+            ['role' => 'system', 'content' => $rule->custom_instructions ?? 'You are evaluating content against a specific rule.'],
+            ['role' => 'user', 'content' => $prompt],
+        ],
+        'temperature' => $rule->temperature ?? 0.2,
+        'max_tokens' => $rule->max_tokens ?? 500,
+    ]);
+
+    $result = $response->choices[0]->message->content;
+
+    // Parse result into a score and feedback
+    // Implementation depends on expected response format
+
+    return [
+        'score' => $this->extractScore($result),
+        'feedback' => $this->extractFeedback($result),
+    ];
+}
+
+protected function validateWithAssistant(string $content, Rule $rule)
+{
+    // Similar to the chat completion approach but using assistants API
+}
+
+protected function validateWithEmbeddings(string $content, Rule $rule)
+{
+    // Implementation for semantic matching using embeddings
+}
+
+protected function extractScore(string $result)
+{
+    // Parse the result to extract a numerical score
+    // Implementation depends on expected response format
+}
+
+protected function extractFeedback(string $result)
+{
+    // Parse the result to extract textual feedback
+    // Implementation depends on expected response format
+}
+```
+
+## Error Handling and Retry Mechanism
+
+```php
+protected function callWithRetry(callable $apiCall, int $maxRetries = 3)
+{
+    $attempts = 0;
+    $lastException = null;
+
+    while ($attempts < $maxRetries) {
+        try {
+            return $apiCall();
+        } catch (\Exception $e) {
+            $lastException = $e;
+            $attempts++;
+
+            // Exponential backoff
+            $sleepTime = pow(2, $attempts) * 1000000; // microseconds
+            usleep($sleepTime);
+        }
+    }
+
+    // Log the failure
+    \Log::error('OpenAI API call failed after ' . $maxRetries . ' attempts', [
+        'exception' => $lastException ? $lastException->getMessage() : null,
+    ]);
+
+    throw $lastException ?: new \Exception('API call failed after ' . $maxRetries . ' attempts');
+}
+```
+
+## Content Type-Specific Prompts
+
+```php
+public function getResumePrompt(JobPost $jobPost, User $user)
+{
+    return <<<EOT
+Create a professional resume for a job application with the following details:
+
+Job Title: {$jobPost->job_title}
+Company: {$jobPost->company_name}
+Job Description: {$jobPost->job_description}
+Required Skills: {$this->formatSkills($jobPost->required_skills)}
+
+Applicant Information:
+Name: {$user->first_name} {$user->last_name}
+Location: {$user->location}
+LinkedIn: {$user->linkedin_url}
+GitHub: {$user->github_url}
+
+The resume should be between {$jobPost->resume_min_words} and {$jobPost->resume_max_words} words.
+Focus on highlighting relevant skills and experience that match the job requirements.
+Use quantifiable achievements where possible.
+Follow ATS optimization best practices.
+EOT;
+}
+
+public function getCoverLetterPrompt(JobPost $jobPost, User $user)
+{
+    return <<<EOT
+Create a compelling cover letter for a job application with the following details:
+
+Job Title: {$jobPost->job_title}
+Company: {$jobPost->company_name}
+Job Description: {$jobPost->job_description}
+Required Skills: {$this->formatSkills($jobPost->required_skills)}
+
+Applicant Information:
+Name: {$user->first_name} {$user->last_name}
+Location: {$user->location}
+
+The cover letter should:
+1. Start with a strong hook related to the company or position
+2. Be between {$jobPost->cover_letter_min_words} and {$jobPost->cover_letter_max_words} words
+3. Highlight how the applicant's skills match the job requirements
+4. Include a strong closing paragraph
+5. Maintain a professional but conversational tone
+EOT;
+}
+
+protected function formatSkills($skills)
+{
+    if (is_string($skills)) {
+        return $skills;
+    }
+
+    if (is_array($skills) || $skills instanceof \ArrayAccess) {
+        return implode(', ', $skills);
+    }
+
+    return '';
+}
+```

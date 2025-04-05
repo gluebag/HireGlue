@@ -1,0 +1,12 @@
+name: HireGlue-Development
+php: '8.4'
+secured: true
+aliases:
+  - hireglue.test
+  - hireglue
+  - HireGlue.test
+integrations:
+#  forge:
+#    boildata.io:
+#      server-id: 472863
+#      site-id: 1364342

@@ -1,0 +1,61 @@
+# Add directories or file patterns to ignore during indexing
+
+# Common files to ignore
+*.log
+
+# *.pdf
+# *.txt
+
+*.csv
+*.json
+!package.json
+!composer.json
+*.bin
+*.pcapng
+*.pyc
+*.so
+.DS_Store
+Thumbs.db
+
+# Large directories
+bootstrap/
+public/
+storage/
+vendor/
+node_modules/
+.git/
+
+# Nova specific
+public/vendor/nova/
+nova-components/*/dist/
+nova-components/*/node_modules/
+nova-components/*/package-lock.json
+nova-components/*/.idea
+nova-components/*/vendor/
+nova-components/*/yarn.lock
+nova-components/*/composer.lock
+
+# Laravel specific
+.env
+.env.*
+!.env.example
+storage/*.key
+
+# Cache and compiled assets
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/views/
+storage/app/
+public/storage
+public/hot
+
+# Testing
+coverage/
+phpunit.xml
+.phpunit.result.cache
+
+# IDE specific
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace

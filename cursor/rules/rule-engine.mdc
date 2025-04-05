@@ -1,0 +1,359 @@
+---
+description: Guidelines for implementing the rules engine for resume and cover letter validation
+globs: app/Services/RuleEngine*.php
+alwaysApply: true
+---
+
+# Rules Engine Guidelines
+
+## Rule Model Structure
+
+```php
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Rule extends Model
+{
+    use SoftDeletes;
+
+    protected $fillable = [
+        'name',
+        'description',
+        'source',
+        'type',
+        'is_active',
+        'importance',
+        'custom_instructions',
+        'prompt_template',
+        'api_call_type',
+        'model_name',
+        'tool_configuration',
+        'function_schema',
+        'temperature',
+        'max_tokens',
+        'use_embeddings',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+        'importance' => 'integer',
+        'tool_configuration' => 'array',
+        'function_schema' => 'array',
+        'temperature' => 'float',
+        'max_tokens' => 'integer',
+        'use_embeddings' => 'boolean',
+    ];
+
+    public function getScoreAttribute()
+    {
+        // Calculate and return the rule's score
+    }
+}
+```
+
+## RuleEngineService Structure
+
+```php
+namespace App\Services;
+
+use App\Models\Rule;
+use App\Models\Resume;
+use App\Models\CoverLetter;
+use App\Models\JobPost;
+
+class RuleEngineService
+{
+    protected $openAIService;
+
+    public function __construct(OpenAIService $openAIService)
+    {
+        $this->openAIService = $openAIService;
+    }
+
+    // Service methods...
+}
+```
+
+## Rule Validation Methods
+
+```php
+public function validateResume(Resume $resume)
+{
+    $rules = Rule::where('type', 'resume')
+        ->orWhere('type', 'both')
+        ->where('is_active', true)
+        ->orderBy('importance', 'desc')
+        ->get();
+
+    return $this->validateContent($resume->content, $rules, $resume->jobPost);
+}
+
+public function validateCoverLetter(CoverLetter $coverLetter)
+{
+    $rules = Rule::where('type', 'cover_letter')
+        ->orWhere('type', 'both')
+        ->where('is_active', true)
+        ->orderBy('importance', 'desc')
+        ->get();
+
+    return $this->validateContent($coverLetter->content, $rules, $coverLetter->jobPost);
+}
+
+public function validateContent(string $content, $rules, JobPost $jobPost = null)
+{
+    $results = [];
+    $totalScore = 0;
+    $maxPossibleScore = 0;
+
+    foreach ($rules as $rule) {
+        $validationResult = $this->validateAgainstRule($content, $rule, $jobPost);
+
+        $results[$rule->id] = [
+            'rule' => $rule->name,
+            'description' => $rule->description,
+            'source' => $rule->source,
+            'score' => $validationResult['score'],
+            'max_score' => 10,
+            'importance' => $rule->importance,
+            'weighted_score' => $validationResult['score'] * $rule->importance,
+            'max_weighted_score' => 10 * $rule->importance,
+            'feedback' => $validationResult['feedback'],
+        ];
+
+        $totalScore += $validationResult['score'] * $rule->importance;
+        $maxPossibleScore += 10 * $rule->importance;
+    }
+
+    $percentageScore = ($maxPossibleScore > 0) ? ($totalScore / $maxPossibleScore * 100) : 0;
+
+    return [
+        'rules' => $results,
+        'total_score' => $totalScore,
+        'max_possible_score' => $maxPossibleScore,
+        'percentage_score' => $percentageScore,
+    ];
+}
+
+public function validateAgainstRule(string $content, Rule $rule, JobPost $jobPost = null)
+{
+    // Prepare contextual data for validation
+    $context = [];
+
+    if ($jobPost) {
+        $context['job_post'] = $jobPost->toArray();
+    }
+
+    // Delegate to OpenAI service for validation
+    return $this->openAIService->validateAgainstRule($content, $rule, $context);
+}
+```
+
+## Rule Implementation Examples
+
+### No Typos Rule
+
+```php
+// Database entry for the rule
+[
+    'name' => 'No Typos',
+    'description' => 'The document should have zero typos or grammatical errors.',
+    'source' => 'Ex-Google Recruiter Video',
+    'type' => 'both',
+    'is_active' => true,
+    'importance' => 10,
+    'custom_instructions' => 'You are an expert proofreader evaluating a document for typos and grammatical errors.',
+    'prompt_template' => "Please evaluate the following text for spelling and grammatical errors. Provide a score from 0-10 where 10 means perfect with no errors and 0 means multiple severe errors.\n\nText to evaluate:\n{{content}}\n\nScore (0-10):\nFeedback:",
+    'api_call_type' => 'chat',
+    'model_name' => 'gpt-4',
+    'temperature' => 0.2,
+    'max_tokens' => 500,
+]
+```
+
+### Single-Column Layout Rule
+
+```php
+// Database entry for the rule
+[
+    'name' => 'Single-Column Layout',
+    'description' => 'The resume should use a single-column layout for ATS compatibility.',
+    'source' => 'Ex-Google Recruiter Video',
+    'type' => 'resume',
+    'is_active' => true,
+    'importance' => 9,
+    'custom_instructions' => 'You are an expert resume format evaluator checking if a resume uses a single-column layout for ATS compatibility.',
+    'prompt_template' => "Evaluate if the following resume text indicates a single-column layout format for ATS compatibility. Provide a score from 0-10 where 10 means clearly single-column layout and 0 means definitely not single-column layout.\n\nResume text:\n{{content}}\n\nScore (0-10):\nFeedback:",
+    'api_call_type' => 'chat',
+    'model_name' => 'gpt-4',
+    'temperature' => 0.2,
+    'max_tokens' => 500,
+]
+```
+
+### Hook The Reader Rule
+
+```php
+// Database entry for the rule
+[
+    'name' => 'Hook The Reader',
+    'description' => 'The cover letter should start with a compelling hook related to the company.',
+    'source' => 'Write an Amazing Cover Letter: 3 Golden Rules',
+    'type' => 'cover_letter',
+    'is_active' => true,
+    'importance' => 8,
+    'custom_instructions' => 'You are evaluating whether a cover letter begins with an engaging hook that connects to the company or position.',
+    'prompt_template' => "Evaluate if the following cover letter begins with a compelling hook that connects to the company or position. The hook should be in the first paragraph and create immediate interest. Provide a score from 0-10 where 10 means excellent hook with clear company connection and 0 means no hook or company connection at all.\n\nCover letter:\n{{content}}\n\nScore (0-10):\nFeedback:",
+    'api_call_type' => 'chat',
+    'model_name' => 'gpt-4',
+    'temperature' => 0.3,
+    'max_tokens' => 500,
+]
+```
+
+### LinkedIn Profile Rule
+
+```php
+// Database entry for the rule
+[
+    'name' => 'Include LinkedIn Profile',
+    'description' => 'The resume should include a link to LinkedIn profile.',
+    'source' => 'Write an Incredible Resume: 5 Golden Rules!',
+    'type' => 'resume',
+    'is_active' => true,
+    'importance' => 7,
+    'custom_instructions' => 'You are evaluating whether a resume includes a LinkedIn profile link.',
+    'prompt_template' => "Evaluate if the following resume text includes a LinkedIn profile URL or clear reference. Provide a score from 0-10 where 10 means LinkedIn profile is clearly included and 0 means no mention of LinkedIn at all.\n\nResume text:\n{{content}}\n\nScore (0-10):\nFeedback:",
+    'api_call_type' => 'chat',
+    'model_name' => 'gpt-4',
+    'temperature' => 0.2,
+    'max_tokens' => 400,
+]
+```
+
+### Measurable Results Rule
+
+```php
+// Database entry for the rule
+[
+    'name' => 'Include Measurable Results',
+    'description' => 'The resume should include quantifiable metrics and data points to demonstrate achievements.',
+    'source' => 'Write an Incredible Resume: 5 Golden Rules!',
+    'type' => 'resume',
+    'is_active' => true,
+    'importance' => 9,
+    'custom_instructions' => 'You are evaluating whether a resume includes quantifiable metrics and measurable results.',
+    'prompt_template' => "Evaluate if the following resume text includes quantifiable metrics and measurable results to demonstrate achievements. Look for numbers, percentages, dollar amounts, etc. Provide a score from 0-10 where 10 means excellent use of quantifiable metrics throughout and 0 means no measurable results at all.\n\nResume text:\n{{content}}\n\nScore (0-10):\nFeedback:",
+    'api_call_type' => 'chat',
+    'model_name' => 'gpt-4',
+    'temperature' => 0.3,
+    'max_tokens' => 500,
+]
+```
+
+## RuleSeeder Implementation
+
+```php
+namespace Database\Seeders;
+
+use App\Models\Rule;
+use Illuminate\Database\Seeder;
+
+class RuleSeeder extends Seeder
+{
+    public function run()
+    {
+        $rules = [
+            // No Typos Rule
+            [
+                'name' => 'No Typos',
+                'description' => 'The document should have zero typos or grammatical errors.',
+                'source' => 'Ex-Google Recruiter Video',
+                'type' => 'both',
+                'is_active' => true,
+                'importance' => 10,
+                'custom_instructions' => 'You are an expert proofreader evaluating a document for typos and grammatical errors.',
+                'prompt_template' => "Please evaluate the following text for spelling and grammatical errors. Provide a score from 0-10 where 10 means perfect with no errors and 0 means multiple severe errors.\n\nText to evaluate:\n{{content}}\n\nScore (0-10):\nFeedback:",
+                'api_call_type' => 'chat',
+                'model_name' => 'gpt-4',
+                'temperature' => 0.2,
+                'max_tokens' => 500,
+            ],
+
+            // Add more rules here...
+        ];
+
+        foreach ($rules as $rule) {
+            Rule::updateOrCreate(
+                ['name' => $rule['name'], 'type' => $rule['type']],
+                $rule
+            );
+        }
+    }
+}
+```
+
+## Score Calculation Utilities
+
+```php
+protected function extractScoreFromResponse(string $response)
+{
+    // Extract score from the AI response
+    if (preg_match('/Score \(0-10\):\s*(\d+(\.\d+)?)/i', $response, $matches)) {
+        return (float) $matches[1];
+    }
+
+    // Fallback if no explicit score is found
+    // Analyze response content to estimate a score
+
+    return 5; // Default middle score if extraction fails
+}
+
+protected function extractFeedbackFromResponse(string $response)
+{
+    // Extract feedback from the AI response
+    if (preg_match('/Feedback:(.*?)($|Score)/s', $response, $matches)) {
+        return trim($matches[1]);
+    }
+
+    // Return the whole response as feedback if extraction fails
+    return $response;
+}
+```
+
+## Rule Testing Utilities
+
+```php
+public function testRule(Rule $rule, string $content)
+{
+    $validationResult = $this->openAIService->validateAgainstRule($content, $rule);
+
+    return [
+        'rule' => $rule->toArray(),
+        'content' => $content,
+        'result' => $validationResult,
+    ];
+}
+
+public function testAllRules(string $content, string $type = null)
+{
+    $query = Rule::query()->where('is_active', true);
+
+    if ($type) {
+        $query->where(function ($q) use ($type) {
+            $q->where('type', $type)
+              ->orWhere('type', 'both');
+        });
+    }
+
+    $rules = $query->orderBy('importance', 'desc')->get();
+
+    $results = [];
+    foreach ($rules as $rule) {
+        $results[] = $this->testRule($rule, $content);
+    }
+
+    return $results;
+}
+```

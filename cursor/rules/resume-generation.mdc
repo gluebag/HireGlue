@@ -1,0 +1,502 @@
+---
+description: Guidelines for implementing resume and cover letter generation in HireGlue
+globs: app/Services/Resume*.php,app/Services/CoverLetter*.php
+alwaysApply: true
+---
+
+# Resume and Cover Letter Generation Guidelines
+
+## Resume Generation Service
+
+```php
+namespace App\Services;
+
+use App\Models\Resume;
+use App\Models\JobPost;
+use App\Models\User;
+use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+
+class ResumeGenerationService
+{
+    protected $openAIService;
+    protected $ruleEngineService;
+
+    public function __construct(OpenAIService $openAIService, RuleEngineService $ruleEngineService)
+    {
+        $this->openAIService = $openAIService;
+        $this->ruleEngineService = $ruleEngineService;
+    }
+
+    // Service methods...
+}
+```
+
+## Generation Process
+
+```php
+public function generate(JobPost $jobPost, User $user)
+{
+    // Get all active resume rules
+    $rules = $this->getRules();
+
+    // Generate initial content using OpenAI
+    $content = $this->openAIService->generateResume($jobPost, $user, $rules);
+
+    // Create resume record
+    $resume = Resume::create([
+        'user_id' => $user->id,
+        'job_post_id' => $jobPost->id,
+        'content' => $content,
+        'word_count' => str_word_count($content),
+    ]);
+
+    // Validate against rules
+    $validationResults = $this->ruleEngineService->validateResume($resume);
+    $resume->rule_scores = $validationResults;
+    $resume->save();
+
+    // Generate PDF if score is acceptable
+    if ($validationResults['percentage_score'] >= config('hireglue.minimum_score', 70)) {
+        $this->generatePDF($resume);
+    }
+
+    return $resume;
+}
+
+protected function getRules()
+{
+    return \App\Models\Rule::where(function($query) {
+        $query->where('type', 'resume')
+              ->orWhere('type', 'both');
+    })
+    ->where('is_active', true)
+    ->orderBy('importance', 'desc')
+    ->get();
+}
+```
+
+## PDF Generation
+
+```php
+public function generatePDF(Resume $resume)
+{
+    $user = $resume->user;
+    $jobPost = $resume->jobPost;
+
+    $html = view('pdfs.resume', [
+        'resume' => $resume,
+        'user' => $user,
+        'jobPost' => $jobPost,
+    ])->render();
+
+    $pdf = PDF::loadHTML($html);
+
+    $fileName = 'resume_' . $user->id . '_' . $jobPost->id . '_' . time() . '.pdf';
+    $path = 'resumes/' . $fileName;
+
+    Storage::disk('public')->put($path, $pdf->output());
+
+    $resume->file_path = $path;
+    $resume->save();
+
+    return $path;
+}
+```
+
+## Quality Improvement
+
+```php
+public function regenerateWithFeedback(Resume $resume)
+{
+    $jobPost = $resume->jobPost;
+    $user = $resume->user;
+    $rules = $this->getRules();
+
+    // Get low scoring rules
+    $lowScoringRules = [];
+    foreach ($resume->rule_scores['rules'] as $ruleId => $result) {
+        if ($result['score'] < 7) {
+            $rule = \App\Models\Rule::find($ruleId);
+            if ($rule) {
+                $lowScoringRules[] = [
+                    'name' => $rule->name,
+                    'description' => $rule->description,
+                    'feedback' => $result['feedback'],
+                ];
+            }
+        }
+    }
+
+    // Generate improved content with feedback
+    $content = $this->openAIService->regenerateResume($jobPost, $user, $resume->content, $lowScoringRules);
+
+    // Update resume
+    $resume->content = $content;
+    $resume->word_count = str_word_count($content);
+    $resume->save();
+
+    // Validate again
+    $validationResults = $this->ruleEngineService->validateResume($resume);
+    $resume->rule_scores = $validationResults;
+    $resume->save();
+
+    // Generate PDF if score improved
+    if ($validationResults['percentage_score'] >= config('hireglue.minimum_score', 70)) {
+        $this->generatePDF($resume);
+    }
+
+    return $resume;
+}
+```
+
+## Cover Letter Generation Service
+
+```php
+namespace App\Services;
+
+use App\Models\CoverLetter;
+use App\Models\JobPost;
+use App\Models\User;
+use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+
+class CoverLetterGenerationService
+{
+    protected $openAIService;
+    protected $ruleEngineService;
+
+    public function __construct(OpenAIService $openAIService, RuleEngineService $ruleEngineService)
+    {
+        $this->openAIService = $openAIService;
+        $this->ruleEngineService = $ruleEngineService;
+    }
+
+    // Similar methods to ResumeGenerationService, adapted for cover letters
+}
+```
+
+## Resume Blade Template
+
+```blade
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Resume - {{ $user->first_name }} {{ $user->last_name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .contact-info {
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+
+        .job {
+            margin-bottom: 15px;
+        }
+
+        .job-title {
+            font-weight: bold;
+        }
+
+        .job-company {
+            font-style: italic;
+        }
+
+        .job-date {
+            float: right;
+        }
+
+        .job-description {
+            margin-top: 5px;
+        }
+
+        .skills {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .skill {
+            background-color: #f0f0f0;
+            padding: 5px 10px;
+            margin: 0 5px 5px 0;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="name">{{ $user->first_name }} {{ $user->last_name }}</div>
+        <div class="contact-info">
+            {{ $user->location }} | {{ $user->phone_number }} | {{ $user->email }}<br>
+            @if($user->linkedin_url)
+                <a href="{{ $user->linkedin_url }}">LinkedIn</a> |
+            @endif
+            @if($user->github_url)
+                <a href="{{ $user->github_url }}">GitHub</a> |
+            @endif
+            @if($user->portfolio_url)
+                <a href="{{ $user->portfolio_url }}">Portfolio</a>
+            @endif
+        </div>
+    </div>
+
+    {!! $resume->content !!}
+</body>
+</html>
+```
+
+## Cover Letter Blade Template
+
+```blade
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Cover Letter - {{ $user->first_name }} {{ $user->last_name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 40px;
+        }
+
+        .letterhead {
+            margin-bottom: 30px;
+        }
+
+        .date {
+            margin-bottom: 20px;
+        }
+
+        .recipient {
+            margin-bottom: 20px;
+        }
+
+        .content {
+            margin-bottom: 30px;
+        }
+
+        .signature {
+            margin-top: 40px;
+        }
+
+        .name {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="letterhead">
+        {{ $user->first_name }} {{ $user->last_name }}<br>
+        {{ $user->location }}<br>
+        {{ $user->phone_number }}<br>
+        {{ $user->email }}
+    </div>
+
+    <div class="date">
+        {{ date('F j, Y') }}
+    </div>
+
+    <div class="recipient">
+        Hiring Manager<br>
+        {{ $jobPost->company_name }}<br>
+        Re: {{ $jobPost->job_title }} Position
+    </div>
+
+    <div class="content">
+        {!! $coverLetter->content !!}
+    </div>
+
+    <div class="signature">
+        Sincerely,<br><br><br>
+        <div class="name">{{ $user->first_name }} {{ $user->last_name }}</div>
+    </div>
+</body>
+</html>
+```
+
+## Content Analysis
+
+```php
+public function analyzeContent(string $content)
+{
+    // Count words
+    $wordCount = str_word_count($content);
+
+    // Estimate reading time
+    $readingTimeMinutes = ceil($wordCount / 200); // Assuming 200 words per minute reading speed
+
+    // Count keywords (assuming the job post has keywords)
+    $keywordCounts = [];
+
+    // Simple keyword extraction (in practice, use a more sophisticated approach)
+    $jobPost = $this->jobPost;
+    if ($jobPost && $jobPost->required_skills) {
+        $skills = $jobPost->required_skills;
+        if (is_string($skills)) {
+            $skills = json_decode($skills, true) ?: explode(',', $skills);
+        }
+
+        foreach ($skills as $skill) {
+            $skill = trim($skill);
+            $count = substr_count(strtolower($content), strtolower($skill));
+            $keywordCounts[$skill] = $count;
+        }
+    }
+
+    // Readability score (very basic implementation)
+    $sentences = preg_split('/[.!?]+/', $content);
+    $sentenceCount = count(array_filter($sentences));
+    $avgWordsPerSentence = $sentenceCount > 0 ? $wordCount / $sentenceCount : 0;
+
+    // Simple readability score based on average words per sentence
+    // Lower is easier to read
+    $readabilityScore = 0;
+    if ($avgWordsPerSentence < 12) {
+        $readabilityScore = 'Easy';
+    } elseif ($avgWordsPerSentence < 18) {
+        $readabilityScore = 'Moderate';
+    } else {
+        $readabilityScore = 'Complex';
+    }
+
+    return [
+        'word_count' => $wordCount,
+        'reading_time_minutes' => $readingTimeMinutes,
+        'keyword_counts' => $keywordCounts,
+        'sentence_count' => $sentenceCount,
+        'avg_words_per_sentence' => round($avgWordsPerSentence, 1),
+        'readability' => $readabilityScore,
+    ];
+}
+```
+
+## Resume Format Converter
+
+```php
+public function convertToMarkdown(string $content)
+{
+    // This is a simplified example. In practice, you'd want more sophisticated conversion.
+    $markdown = preg_replace('/<h1>(.*?)<\/h1>/i', '# $1', $content);
+    $markdown = preg_replace('/<h2>(.*?)<\/h2>/i', '## $1', $markdown);
+    $markdown = preg_replace('/<h3>(.*?)<\/h3>/i', '### $1', $markdown);
+    $markdown = preg_replace('/<b>(.*?)<\/b>/i', '**$1**', $markdown);
+    $markdown = preg_replace('/<strong>(.*?)<\/strong>/i', '**$1**', $markdown);
+    $markdown = preg_replace('/<i>(.*?)<\/i>/i', '*$1*', $markdown);
+    $markdown = preg_replace('/<em>(.*?)<\/em>/i', '*$1*', $markdown);
+    $markdown = preg_replace('/<ul>(.*?)<\/ul>/is', '$1', $markdown);
+    $markdown = preg_replace('/<li>(.*?)<\/li>/i', '- $1', $markdown);
+    $markdown = preg_replace('/<p>(.*?)<\/p>/i', '$1\n\n', $markdown);
+    $markdown = preg_replace('/<br\s*\/?>/i', "\n", $markdown);
+
+    // Remove any remaining HTML tags
+    $markdown = strip_tags($markdown);
+
+    return $markdown;
+}
+
+public function convertToHTML(string $markdown)
+{
+    // Use a Markdown parser like Parsedown or similar
+    // This is a simplified example
+    $html = preg_replace('/^# (.*?)$/m', '<h1>$1</h1>', $markdown);
+    $html = preg_replace('/^## (.*?)$/m', '<h2>$1</h2>', $html);
+    $html = preg_replace('/^### (.*?)$/m', '<h3>$1</h3>', $html);
+    $html = preg_replace('/\*\*(.*?)\*\*/is', '<strong>$1</strong>', $html);
+    $html = preg_replace('/\*(.*?)\*/is', '<em>$1</em>', $html);
+    $html = preg_replace('/^- (.*?)$/m', '<li>$1</li>', $html);
+    $html = preg_replace('/((?:<li>.*?<\/li>\n?)+)/', '<ul>$1</ul>', $html);
+    $html = preg_replace('/\n{2,}/', '</p><p>', $html);
+    $html = '<p>' . $html . '</p>';
+
+    return $html;
+}
+```
+
+## Template Selection
+
+```php
+public function getTemplateOptions()
+{
+    return [
+        'professional' => [
+            'name' => 'Professional',
+            'description' => 'A clean, professional template suitable for most industries',
+            'preview_image' => 'images/templates/professional.png',
+        ],
+        'modern' => [
+            'name' => 'Modern',
+            'description' => 'A modern template with a contemporary design',
+            'preview_image' => 'images/templates/modern.png',
+        ],
+        'minimal' => [
+            'name' => 'Minimal',
+            'description' => 'A minimalist template focusing on content',
+            'preview_image' => 'images/templates/minimal.png',
+        ],
+        'creative' => [
+            'name' => 'Creative',
+            'description' => 'A creative template for design or artistic roles',
+            'preview_image' => 'images/templates/creative.png',
+        ],
+    ];
+}
+
+public function generateWithTemplate(Resume $resume, string $templateKey = 'professional')
+{
+    $template = $this->getTemplateOptions()[$templateKey] ?? $this->getTemplateOptions()['professional'];
+
+    $html = view('pdfs.templates.' . $templateKey, [
+        'resume' => $resume,
+        'user' => $resume->user,
+        'jobPost' => $resume->jobPost,
+    ])->render();
+
+    $pdf = PDF::loadHTML($html);
+
+    $fileName = 'resume_' . $resume->user_id . '_' . $resume->job_post_id . '_' . time() . '_' . $templateKey . '.pdf';
+    $path = 'resumes/' . $fileName;
+
+    Storage::disk('public')->put($path, $pdf->output());
+
+    $resume->file_path = $path;
+    $resume->template = $templateKey;
+    $resume->save();
+
+    return $path;
+}
+```

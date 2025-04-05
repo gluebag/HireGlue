@@ -1,0 +1,196 @@
+---
+description: Guidelines for latest Laravel Nova development
+globs: app/Nova/**/*.php
+alwaysApply: true
+---
+
+# Laravel Nova Latest Guidelines
+
+## Nova Resources
+
+### Resource Structure
+
+```php
+use Laravel\Nova\Resource;
+use Laravel\Nova\Fields\ID;
+use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Fields\HasMany;
+use Laravel\Nova\Panel;
+
+class JobPost extends Resource
+{
+    public static $model = \App\Models\JobPost::class;
+
+    public static $title = 'job_title';
+
+    public static $search = [
+        'id', 'job_title', 'company_name', 'job_description',
+    ];
+
+    public function fields(Request $request)
+    {
+        return [
+            ID::make()->sortable(),
+
+            Panel::make('Basic Information', [
+                Text::make('Job Title')
+                    ->sortable()
+                    ->rules('required', 'max:255'),
+
+                Text::make('Company Name')
+                    ->sortable()
+                    ->rules('required', 'max:255'),
+
+                Textarea::make('Job Description')
+                    ->hideFromIndex(),
+            ]),
+
+            Panel::make('Requirements', [
+                // Skills fields
+            ]),
+
+            HasMany::make('Resumes'),
+            HasMany::make('Cover Letters'),
+        ];
+    }
+}
+```
+
+### Best Practices
+
+- Organize fields logically with panels
+- Implement field-specific validation rules
+- Use appropriate field types for different data
+- Implement authorization with policies
+- Use `withMeta()` for additional field properties
+
+### Performance Optimization
+
+- Use `$with` for eager loading relationships
+- Implement custom `indexQuery()` for performance
+- Use custom fields for complex data visualization
+- Consider index field visibility carefully
+
+## Custom Nova Fields
+
+```php
+use Laravel\Nova\Fields\Field;
+
+class RuleComplianceField extends Field
+{
+    public $component = 'rule-compliance-field';
+
+    public function __construct($name, $attribute = null, $resolveCallback = null)
+    {
+        parent::__construct($name, $attribute, $resolveCallback);
+
+        $this->withMeta(['defaultValue' => []]);
+    }
+
+    public function defaultRules(array $rules)
+    {
+        return $this->withMeta(['defaultRules' => $rules]);
+    }
+}
+```
+
+## Nova Actions
+
+```php
+use Laravel\Nova\Actions\Action;
+use Laravel\Nova\Fields\ActionFields;
+use Illuminate\Support\Collection;
+
+class GenerateResume extends Action
+{
+    public $name = 'Generate Resume';
+
+    public function handle(ActionFields $fields, Collection $models)
+    {
+        foreach ($models as $model) {
+            // Implementation
+        }
+
+        return Action::message('Resume generated successfully!');
+    }
+
+    public function fields()
+    {
+        return [
+            // Fields for action form
+        ];
+    }
+}
+```
+
+## Nova Filters
+
+```php
+use Laravel\Nova\Filters\Filter;
+use Illuminate\Http\Request;
+
+class JobTypeFilter extends Filter
+{
+    public function apply(Request $request, $query, $value)
+    {
+        return $query->where('job_type', $value);
+    }
+
+    public function options(Request $request)
+    {
+        return [
+            'Full-time' => 'full-time',
+            'Part-time' => 'part-time',
+            'Contract' => 'contract',
+        ];
+    }
+}
+```
+
+## Nova Cards
+
+```php
+use Laravel\Nova\Metrics\Value;
+
+class TotalResumes extends Value
+{
+    public function calculate(Request $request)
+    {
+        return $this->count($request, \App\Models\Resume::class);
+    }
+}
+```
+
+## Nova Tools & Custom Components
+
+### Component Registration
+
+```php
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\ServiceProvider;
+use Laravel\Nova\Nova;
+
+class NovaServiceProvider extends ServiceProvider
+{
+    public function boot()
+    {
+        Nova::resources([
+            JobPost::class,
+            Resume::class,
+            CoverLetter::class,
+        ]);
+
+        Nova::tools([
+            // Custom tools
+        ]);
+    }
+}
+```
+
+### JavaScript Components
+
+```javascript
+Nova.booting((Vue) => {
+    Vue.component('rule-compliance-field', require('./components/Fields/RuleComplianceField'));
+});
+```
