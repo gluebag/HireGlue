@@ -12,12 +12,22 @@ return new class extends Migration {
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('first_name');
+            $table->string('last_name');
+            $table->date('date_of_birth')->nullable();
+            $table->string('profile_photo_url')->nullable();
             $table->string('email')->unique();
+            $table->string('phone_number')->nullable();
+            $table->string('location')->nullable(); // City, State, Country
+            $table->string('linkedin_url')->nullable();
+            $table->string('github_url')->nullable();
+            $table->string('personal_website_url')->nullable();
+            $table->string('portfolio_url')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
+            $table->softDeletes();
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
