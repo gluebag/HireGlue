@@ -24,8 +24,17 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            'first_name' => fake()->firstName(),
+            'last_name' => fake()->lastName(),
+            'date_of_birth' => fake()->dateTimeBetween('-60 years', '-18 years'),
+            'profile_photo_url' => fake()->imageUrl(200, 200, 'people'),
             'email' => fake()->unique()->safeEmail(),
+            'phone_number' => fake()->phoneNumber(),
+            'location' => fake()->city() . ', ' . fake()->stateAbbr() . ', USA',
+            'linkedin_url' => 'https://linkedin.com/in/' . fake()->userName(),
+            'github_url' => 'https://github.com/' . fake()->userName(),
+            'personal_website_url' => 'https://' . fake()->domainName(),
+            'portfolio_url' => null,
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),

@@ -11,6 +11,9 @@ class RulesServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * @var RulesService
+     */
     protected $rulesService;
 
     protected function setUp(): void
