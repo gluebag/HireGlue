@@ -3,7 +3,7 @@
 namespace App\Nova;
 
 use App\Nova\Actions\ConvertGoogleJobPost;
-use App\Nova\Actions\ImportJobPostFromUrl;
+use App\Nova\Actions\ImportJobPostFromContent;
 use App\Nova\Repeaters\EducationItem;
 use App\Nova\Repeaters\ExperienceItem;
 use App\Nova\Repeaters\SkillItem;
@@ -237,7 +237,7 @@ class JobPost extends Resource
     {
         return [
             ConvertGoogleJobPost::make()->standalone(),
-            ImportJobPostFromUrl::make()->standalone(),
+            ImportJobPostFromContent::make()->standalone(),
             
             new \App\Nova\Actions\GenerateResume,
             new \App\Nova\Actions\GenerateCoverLetter,

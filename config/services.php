@@ -48,4 +48,8 @@ return [
         'model' => env('OPENAI_MODEL', 'gpt-4o'),
     ],
 
+    'html_to_markdown' => [
+        'api_key' => env('HTML_TO_MARKDOWN_API_KEY', '')
+    ],
+
 ];
