@@ -2,6 +2,7 @@
 
 namespace App\Nova\Actions;
 
+use App\Services\HtmlToMarkdownService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
@@ -53,11 +54,6 @@ class ConvertGoogleJobPost extends Action //  implements ShouldQueue
             Text::make('Job Post URL', 'job_post_url')
                 ->rules('required', 'url')
                 ->help('Enter the URL of the Google job post you want to import'),
-
-            Text::make('API Key', 'api_key')
-                ->rules('required')
-                ->help('Your html-to-markdown API key')
-                ->default(config('services.html_to_markdown.api_key', '')),
         ];
     }
 
@@ -82,15 +78,13 @@ class ConvertGoogleJobPost extends Action //  implements ShouldQueue
                 return Action::danger('Failed to fetch job post HTML content.');
             }
 
-            // Step 2: Convert HTML to Markdown using html-to-markdown API
+            // Step 2: Convert HTML to Markdown using html-to-markdown
             Log::debug('Converting HTML to Markdown', [
                 'url' => $jobPostUrl,
-                'api_key' => $fields->api_key,
                 'html_length' => strlen($htmlContent),
                 'html_content' => $htmlContent,
             ]);
-            $markdown = $this->convertHtmlToMarkdown($jobPostUrl, $htmlContent, $fields->api_key);
-
+            $markdown = app(HtmlToMarkdownService::class)->convert($htmlContent, true, $jobPostUrl);
             if (!$markdown) {
                 return Action::danger('Failed to convert HTML to Markdown.');
             }
@@ -140,41 +134,6 @@ class ConvertGoogleJobPost extends Action //  implements ShouldQueue
 
         } catch (\Exception $e) {
             throw new \RuntimeException('Failed to fetch job post HTML: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Convert HTML content to Markdown using html-to-markdown API.
-     *
-     * @param string $html
-     * @param string $apiKey
-     * @return string|null
-     */
-    protected function convertHtmlToMarkdown(string $url, string $html, string $apiKey): ?string
-    {
-        try {
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'X-API-Key' => $apiKey
-            ])->post('https://api.html-to-markdown.com/v1/convert', [
-                'html' => $html,
-
-                'plugins' => [
-                    'strikethrough' => [],
-                    'table' => [],
-                ],
-
-                // needs to be just scheme and domain, no path
-                'domain' => parse_url($url, PHP_URL_SCHEME) . '://' . parse_url($url, PHP_URL_HOST)
-            ]);
-
-            if ($response->successful()) {
-                return $response->json('markdown');
-            }
-
-            return null;
-        } catch (\Exception $e) {
-            return null;
         }
     }
 
@@ -287,7 +246,7 @@ class ConvertGoogleJobPost extends Action //  implements ShouldQueue
                 ];
             }, $jobData['required_skills']);
         }
-        
+
         // Format preferred skills
         if (!empty($jobData['preferred_skills'])) {
             $jobData['preferred_skills'] = array_map(function($skill) {
@@ -297,7 +256,7 @@ class ConvertGoogleJobPost extends Action //  implements ShouldQueue
                 ];
             }, $jobData['preferred_skills']);
         }
-        
+
         // Format required experience
         if (!empty($jobData['required_experience'])) {
             $jobData['required_experience'] = array_map(function($exp) {
@@ -307,7 +266,7 @@ class ConvertGoogleJobPost extends Action //  implements ShouldQueue
                 ];
             }, $jobData['required_experience']);
         }
-        
+
         // Format required education
         if (!empty($jobData['required_education'])) {
             $jobData['required_education'] = array_map(function($edu) {
@@ -317,7 +276,7 @@ class ConvertGoogleJobPost extends Action //  implements ShouldQueue
                 ];
             }, $jobData['required_education']);
         }
-        
+
         return $jobData;
     }
 

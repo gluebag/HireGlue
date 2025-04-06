@@ -31,6 +31,7 @@ class HtmlToMarkdownService
             Log::debug(sprintf('HTML Purified - Length (Before: %s, After: %s)', number_format(strlen($htmlBefore)), number_format(strlen($html))), [
                 'original' => $htmlBefore,
                 'purified' => $html,
+                'baseUrl' => $baseUrl,
             ]);
         }
 
@@ -65,6 +66,7 @@ class HtmlToMarkdownService
         Log::debug(sprintf('HTML to Markdown - Length (<html> Before: %s, <markdown> After: %s)', number_format(strlen($html)), number_format(strlen($markdown))), [
             'original' => $html,
             'markdown' => $markdown,
+            'baseUrl' => $baseUrl,
         ]);
         return $markdown;
     }

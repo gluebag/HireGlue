@@ -19,11 +19,13 @@
         "laravel/sanctum": "^4.0",
         "laravel/telescope": "^5.7",
         "laravel/tinker": "^2.10.1",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "league/html-to-markdown": "^5.1",
         "openai-php/client": "^0.10.3",
         "openai-php/laravel": "^0.11.0",
         "smalot/pdfparser": "^2.12",
-        "spatie/laravel-backup": "^9.2"
+        "spatie/laravel-backup": "^9.2",
+        "symfony/mime": "^7.2"
     },
     "require-dev": {
         "brianium/paratest": "^7.8",

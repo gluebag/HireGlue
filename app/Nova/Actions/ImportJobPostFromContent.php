@@ -2,6 +2,7 @@
 
 namespace App\Nova\Actions;
 
+use App\Services\HtmlToMarkdownService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Collection;
@@ -49,7 +50,7 @@ class ImportJobPostFromContent extends Action
             if (!empty($fields->url)) {
                 // URL is now just for reference and populating the job_post_url field
                 $url = $fields->url;
-                
+
                 // If we also have HTML or markdown content, use that
                 if (!empty($fields->html_content)) {
                     return $this->importFromHtml($fields->html_content, $url, $fields->api_key);
@@ -104,16 +105,15 @@ class ImportJobPostFromContent extends Action
     /**
      * Import from HTML content
      */
-    protected function importFromHtml($htmlContent, $url = null, $apiKey = null)
+    protected function importFromHtml($htmlContent, $url = null)
     {
         try {
-            // Convert HTML to markdown using the html-to-markdown API
-            $markdown = $this->convertHtmlToMarkdown($htmlContent, $url, $apiKey);
-            
+            // Convert HTML to markdown using the html-to-markdown
+            $markdown = app(HtmlToMarkdownService::class)->convert($htmlContent, true, $url);
             if (!$markdown) {
                 return Action::danger('Failed to convert HTML to Markdown.');
             }
-            
+
             // Process the markdown content
             return $this->importFromMarkdown($markdown, $url);
         } catch (Exception $e) {
@@ -134,66 +134,6 @@ class ImportJobPostFromContent extends Action
     }
 
     /**
-     * Convert HTML content to Markdown using html-to-markdown API.
-     *
-     * @param string $html
-     * @param string|null $url
-     * @param string|null $apiKey
-     * @return string|null
-     */
-    protected function convertHtmlToMarkdown(string $html, ?string $url = null, ?string $apiKey = null): ?string
-    {
-        try {
-            // If no API key is provided, try to get it from config
-            $apiKey = $apiKey ?? config('services.html_to_markdown.api_key', '');
-            
-            if (empty($apiKey)) {
-                throw new Exception('HTML to Markdown API key is required');
-            }
-            
-            $domain = null;
-            if ($url) {
-                $domain = parse_url($url, PHP_URL_SCHEME) . '://' . parse_url($url, PHP_URL_HOST);
-            }
-            
-            $payload = [
-                'html' => $html,
-                'plugins' => [
-                    'strikethrough' => [],
-                    'table' => [],
-                ],
-            ];
-            
-            // Add domain if available
-            if ($domain) {
-                $payload['domain'] = $domain;
-            }
-            
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'X-API-Key' => $apiKey
-            ])->post('https://api.html-to-markdown.com/v1/convert', $payload);
-
-            if ($response->successful()) {
-                return $response->json('markdown');
-            }
-            
-            Log::error('HTML to Markdown API error', [
-                'status' => $response->status(),
-                'response' => $response->body()
-            ]);
-            
-            return null;
-        } catch (Exception $e) {
-            Log::error('Exception in HTML to Markdown conversion', [
-                'message' => $e->getMessage(),
-                'exception' => $e
-            ]);
-            return null;
-        }
-    }
-
-    /**
      * Analyze job post content using OpenAI
      */
     protected function analyzeJobContent($content, $url = null)
@@ -201,21 +141,21 @@ class ImportJobPostFromContent extends Action
         try {
             // Initialize JobPostAIService
             $aiService = app(JobPostAIService::class);
-            
+
             // Analyze the job post content
             $jobData = $aiService->analyzeJobPost($content);
-            
+
             // Add URL and user ID
             if ($url) {
                 $jobData['job_post_url'] = $url;
             }
-            
+
             $jobData['job_post_date'] = now();
             $jobData['user_id'] = Auth::id();
-            
+
             // Create the job post
             return $this->createJobPost($jobData);
-            
+
         } catch (Exception $e) {
             Log::error('Error analyzing job post: ' . $e->getMessage(), [
                 'exception' => $e,
@@ -224,7 +164,7 @@ class ImportJobPostFromContent extends Action
             return Action::danger('Error analyzing job post: ' . $e->getMessage());
         }
     }
-    
+
     /**
      * Create job post from parsed data
      */
@@ -232,7 +172,7 @@ class ImportJobPostFromContent extends Action
     {
         // Format repeater fields for Nova
         $data = $this->formatRepeaterFields($data);
-        
+
         // Create the job post
         $jobPost = JobPost::create($data);
 
@@ -241,7 +181,7 @@ class ImportJobPostFromContent extends Action
 
     /**
      * Format repeater fields for Nova
-     * 
+     *
      * @param array $data
      * @return array
      */
@@ -256,7 +196,7 @@ class ImportJobPostFromContent extends Action
                 ];
             }, $data['required_skills']);
         }
-        
+
         // Format preferred skills
         if (isset($data['preferred_skills']) && is_array($data['preferred_skills'])) {
             $data['preferred_skills'] = array_map(function($skill) {
@@ -266,7 +206,7 @@ class ImportJobPostFromContent extends Action
                 ];
             }, $data['preferred_skills']);
         }
-        
+
         // Format required experience
         if (isset($data['required_experience']) && is_array($data['required_experience'])) {
             $data['required_experience'] = array_map(function($exp) {
@@ -276,7 +216,7 @@ class ImportJobPostFromContent extends Action
                 ];
             }, $data['required_experience']);
         }
-        
+
         // Format required education
         if (isset($data['required_education']) && is_array($data['required_education'])) {
             $data['required_education'] = array_map(function($edu) {
