@@ -84,4 +84,12 @@ class Project extends Resource
                 ->hideFromIndex(),
         ];
     }
+
+    public function actions(NovaRequest $request): array
+    {
+        return [
+            \App\Nova\Actions\ImportUserData::make()->standalone(),
+            \App\Nova\Actions\ImportGitHubData::make()->standalone(),
+        ];
+    }
 }

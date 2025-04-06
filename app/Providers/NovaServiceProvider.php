@@ -103,7 +103,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
     {
         parent::register();
 
-        Nova::initialPath('/resources/users');
+        Nova::initialPath('/resources/job-posts');
 
         Nova::report(function ($exception) {
             Log::error($exception->getMessage(), [

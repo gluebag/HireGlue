@@ -195,6 +195,10 @@ class User extends Resource
      */
     public function actions(NovaRequest $request): array
     {
-        return [];
+        return [
+            \App\Nova\Actions\ImportUserData::make()->standalone(),
+            \App\Nova\Actions\ImportGitHubData::make()->standalone(),
+            // \App\Nova\Actions\ImportLinkedInData::make()->standalone(),
+        ];
     }
 }

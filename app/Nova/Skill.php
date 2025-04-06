@@ -77,4 +77,14 @@ class Skill extends Resource
                 ->default(0),
         ];
     }
+
+    public function actions(NovaRequest $request): array
+    {
+        return [
+            \App\Nova\Actions\ImportUserData::make()->standalone(),
+            \App\Nova\Actions\ImportGitHubData::make()->standalone(),
+            // \App\Nova\Actions\ImportLinkedInData::make()->standalone(),
+        ];
+    }
 }
+
