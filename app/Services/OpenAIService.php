@@ -9,14 +9,35 @@ use App\Models\JobPost;
 use App\Services\RulesService;
 use Illuminate\Support\Str;
 use Exception;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class OpenAIService
 {
     protected $rulesService;
 
+    /**
+     * The OpenAI API key
+     *
+     * @var string
+     */
+    protected $apiKey;
+
+    /**
+     * The OpenAI API URL
+     *
+     * @var string
+     */
+    protected $apiUrl = 'https://api.openai.com/v1/chat/completions';
+
     public function __construct(RulesService $rulesService)
     {
         $this->rulesService = $rulesService;
+        $this->apiKey = config('services.openai.api_key');
+
+        if (empty($this->apiKey)) {
+            throw new Exception('OpenAI API key is not configured');
+        }
     }
 
     /**
@@ -426,5 +447,64 @@ class OpenAIService
             'max_tokens' => $maxTokens,
             'temperature' => $temperature,
         ]);
+    }
+
+    /**
+     * Generate a completion using OpenAI API
+     *
+     * @param OpenAIPrompt $prompt The prompt to use
+     * @param array $parameters The parameters to replace in the prompt
+     * @return string The generated text
+     * @throws Exception If there is an error
+     */
+    public function generateCompletion(OpenAIPrompt $prompt, array $parameters): string
+    {
+        set_time_limit(0); // Disable time limit for long requests
+        // Replace placeholders in the prompt template
+        $promptText = $this->replacePlaceholders($prompt->prompt_template, $parameters);
+
+        // Prepare the request payload
+        $payload = [
+            'model' => $prompt->model,
+            'messages' => [
+                ['role' => 'system', 'content' => 'You are a helpful assistant.'],
+                ['role' => 'user', 'content' => $promptText],
+            ],
+            'temperature' => (float) $prompt->temperature,
+            'max_tokens' => (int) $prompt->max_tokens,
+        ];
+
+        // Log the request (omit the API key for security)
+        Log::info('OpenAI Request', [
+            'model' => $prompt->model,
+            'max_tokens' => $prompt->max_tokens,
+            'temperature' => $prompt->temperature,
+        ]);
+
+        // Make the API request
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'Content-Type' => 'application/json',
+        ])->timeout(120)->post($this->apiUrl, $payload);
+
+        // Check if the request was successful
+        if (!$response->successful()) {
+            $error = $response->json();
+            Log::error('OpenAI API Error', [
+                'status' => $response->status(),
+                'error' => $error,
+            ]);
+
+            throw new Exception('OpenAI API Error: ' . ($error['error']['message'] ?? 'Unknown error'));
+        }
+
+        // Extract and return the response text
+        $responseData = $response->json();
+        $content = $responseData['choices'][0]['message']['content'] ?? '';
+
+        // Remove any JSON code block markers if present (```json and ```)
+        $content = preg_replace('/```json\s*|\s*```/', '', $content);
+
+        return trim($content);
     }
 }

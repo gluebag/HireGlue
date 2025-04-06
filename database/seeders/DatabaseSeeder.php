@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             RulesSeeder::class,
             OpenAIPromptsSeeder::class,
+            OpenAIPromptSeeder::class,
         ]);
     }
 }

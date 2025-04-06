@@ -9,6 +9,7 @@ use Laravel\Nova\Nova;
 use Laravel\Nova\NovaApplicationServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Log;
 
 class NovaServiceProvider extends NovaApplicationServiceProvider
 {
@@ -104,5 +105,11 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
 
         Nova::initialPath('/resources/users');
 
+        Nova::report(function ($exception) {
+            Log::error($exception->getMessage(), [
+                'exception' => $exception,
+                'stack' => $exception->getTraceAsString(),
+            ]);
+        });
     }
 }
