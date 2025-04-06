@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\HtmlToMarkdownService;
 use Illuminate\Support\ServiceProvider;
 use App\Services\AssistantsService;
 use App\Services\ThreadManagementService;
@@ -33,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(EmbeddingsService::class, function ($app) {
             return new EmbeddingsService();
+        });
+
+        $this->app->singleton(HtmlToMarkdownService::class, function ($app) {
+            return new HtmlToMarkdownService();
         });
 
         $this->app->singleton(GenerationService::class, function ($app) {
