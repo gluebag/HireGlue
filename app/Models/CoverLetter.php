@@ -11,8 +11,14 @@ class CoverLetter extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'job_post_id', 'content', 'file_path', 'word_count',
-        'rule_compliance', 'generation_metadata'
+        'user_id',
+        'job_post_id',
+        'thread_session_id',
+        'content',
+        'file_path',
+        'word_count',
+        'rule_compliance',
+        'generation_metadata'
     ];
 
     protected $casts = [
@@ -28,5 +34,13 @@ class CoverLetter extends Model
     public function jobPost()
     {
         return $this->belongsTo(JobPost::class);
+    }
+
+    /**
+     * Get the thread session that generated this cover letter
+     */
+    public function threadSession()
+    {
+        return $this->belongsTo(ThreadSession::class);
     }
 }

@@ -11,9 +11,18 @@ class Resume extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'job_post_id', 'content', 'file_path', 'word_count',
-        'skills_included', 'experiences_included', 'education_included',
-        'projects_included', 'rule_compliance', 'generation_metadata'
+        'user_id',
+        'job_post_id',
+        'thread_session_id',
+        'content',
+        'file_path',
+        'word_count',
+        'skills_included',
+        'experiences_included',
+        'education_included',
+        'projects_included',
+        'rule_compliance',
+        'generation_metadata'
     ];
 
     protected $casts = [
@@ -33,5 +42,13 @@ class Resume extends Model
     public function jobPost()
     {
         return $this->belongsTo(JobPost::class);
+    }
+
+    /**
+     * Get the thread session that generated this resume
+     */
+    public function threadSession()
+    {
+        return $this->belongsTo(ThreadSession::class);
     }
 }

@@ -5,106 +5,142 @@ namespace App\Services;
 use App\Models\JobPost;
 use App\Models\Resume;
 use App\Models\CoverLetter;
+use App\Models\ThreadSession;
+use App\Models\User;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Exception;
 
 class GenerationService
 {
-    protected $openAI;
-    protected $rules;
+    protected $threadManager;
     protected $pdf;
-    
+
     /**
      * Create a new service instance.
-     * 
-     * @param OpenAIService $openAI
-     * @param RulesService $rules
+     *
+     * @param ThreadManagementService $threadManager
      * @param PDFService $pdf
      * @return void
      */
     public function __construct(
-        OpenAIService $openAI,
-        RulesService $rules,
+        ThreadManagementService $threadManager,
         PDFService $pdf
     ) {
-        $this->openAI = $openAI;
-        $this->rules = $rules;
+        $this->threadManager = $threadManager;
         $this->pdf = $pdf;
     }
-    
+
     /**
      * Generate a resume for a job post
      *
      * @param JobPost $jobPost
      * @return Resume
      */
-    public function generateResume(JobPost $jobPost)
+    public function generateResume(JobPost $jobPost): Resume
     {
         $user = $jobPost->user;
-        
-        // Generate content with OpenAI
-        $result = $this->openAI->generateResume($jobPost, $user, null, []);
-        
-        // Validate against rules
-        $compliance = $this->rules->validateContent(
-            $result['content'],
-            'resume',
-            ['job_post' => $jobPost->toArray(), 'user' => $user->toArray()]
-        );
-        
+
+        try {
+            // Start a resume generation session
+            $session = $this->threadManager->startResumeSession($user, $jobPost);
+
+            // Generate content
+            $content = $this->threadManager->generateContent($session);
+
+            // Count words
+            $wordCount = str_word_count(strip_tags($content));
+
         // Create resume record
         $resume = Resume::create([
             'user_id' => $user->id,
             'job_post_id' => $jobPost->id,
-            'content' => $result['content'],
-            'word_count' => str_word_count(strip_tags($result['content'])),
-            'rule_compliance' => json_encode($compliance),
-            'generation_metadata' => json_encode($result['metadata']),
+                'thread_session_id' => $session->id,
+                'content' => $content,
+                'word_count' => $wordCount,
         ]);
-        
+
         // Generate PDF
         $this->pdf->generateResumePDF($resume);
-        
+
+            // Validate the resume
+            $validation = $this->threadManager->validateDocument($content, 'resume', $jobPost);
+
+            // Update resume with validation results
+            $resume->update([
+                'rule_compliance' => $validation,
+            ]);
+
         return $resume;
+
+        } catch (Exception $e) {
+            Log::error("Resume generation failed", [
+                'job_post_id' => $jobPost->id,
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
+        }
     }
-    
+
     /**
      * Generate a cover letter for a job post
      *
      * @param JobPost $jobPost
      * @return CoverLetter
      */
-    public function generateCoverLetter(JobPost $jobPost)
+    public function generateCoverLetter(JobPost $jobPost): CoverLetter
     {
         $user = $jobPost->user;
-        
-        // Generate content with OpenAI
-        $result = $this->openAI->generateCoverLetter($jobPost, $user);
-        
-        // Validate against rules
-        $compliance = $this->rules->validateContent(
-            $result['content'],
-            'cover_letter',
-            ['job_post' => $jobPost->toArray(), 'user' => $user->toArray()]
-        );
-        
+
+        try {
+            // Start a cover letter generation session
+            $session = $this->threadManager->startCoverLetterSession($user, $jobPost);
+
+            // Generate content
+            $content = $this->threadManager->generateContent($session);
+
+            // Count words
+            $wordCount = str_word_count(strip_tags($content));
+
         // Create cover letter record
         $coverLetter = CoverLetter::create([
             'user_id' => $user->id,
             'job_post_id' => $jobPost->id,
-            'content' => $result['content'],
-            'word_count' => str_word_count(strip_tags($result['content'])),
-            'rule_compliance' => json_encode($compliance),
-            'generation_metadata' => json_encode($result['metadata']),
+                'thread_session_id' => $session->id,
+                'content' => $content,
+                'word_count' => $wordCount,
         ]);
-        
+
         // Generate PDF
         $this->pdf->generateCoverLetterPDF($coverLetter);
-        
+
+            // Validate the cover letter
+            $validation = $this->threadManager->validateDocument($content, 'cover_letter', $jobPost);
+
+            // Update cover letter with validation results
+            $coverLetter->update([
+                'rule_compliance' => $validation,
+            ]);
+
         return $coverLetter;
+
+        } catch (Exception $e) {
+            Log::error("Cover letter generation failed", [
+                'job_post_id' => $jobPost->id,
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
+        }
     }
-    
+
     /**
-     * Regenerate document with feedback
+     * Regenerate a document with feedback
      *
      * @param Resume|CoverLetter $document
      * @param array $feedback
@@ -115,52 +151,70 @@ class GenerationService
         $jobPost = $document->jobPost;
         $user = $document->user;
         $type = $document instanceof Resume ? 'resume' : 'cover_letter';
-        
-        // Prepare feedback for the OpenAI API
-        $feedbackText = $feedback['feedback'] ?? 'Please improve this document.';
-        
-        // Determine which API method to call
-        $methodName = 'generate' . Str::studly($type);
-        
-        // Add feedback to the prompt
-        $extraContext = [
-            'feedback' => $feedbackText,
-            'previous_content' => $document->content
-        ];
-        
+
+        try {
+            // Get the previous session
+            $previousSession = $document->threadSession;
+
+            if (!$previousSession) {
+                throw new Exception("No previous session found for this document");
+            }
+
+            // Create a new session of the same type
+            if ($type === 'resume') {
+                $session = $this->threadManager->startResumeSession($user, $jobPost);
+            } else {
+                $session = $this->threadManager->startCoverLetterSession($user, $jobPost);
+            }
+
+            // Add the feedback to the thread
+            $feedbackMessage = "Please improve the previous {$type} based on this feedback:\n\n";
+            $feedbackMessage .= $feedback['feedback'] ?? 'Please improve this document.';
+            $feedbackMessage .= "\n\nPrevious version:\n\n";
+            $feedbackMessage .= $document->content;
+
+            $this->threadManager->addMessage($session->thread_id, $feedbackMessage);
+
         // Generate new content
-        $result = $this->openAI->$methodName($jobPost, $user, null, $extraContext);
-        
-        // Validate against rules
-        $compliance = $this->rules->validateContent(
-            $result['content'],
-            $type,
-            [
-                'job_post' => $jobPost->toArray(), 
-                'user' => $user->toArray(),
-                'feedback' => $feedbackText
-            ]
-        );
-        
-        // Update the document
+            $content = $this->threadManager->generateContent($session);
+
+            // Count words
+            $wordCount = str_word_count(strip_tags($content));
+
+            // Update the document with new content
         $document->update([
-            'content' => $result['content'],
-            'word_count' => str_word_count(strip_tags($result['content'])),
-            'rule_compliance' => json_encode($compliance),
-            'generation_metadata' => json_encode(array_merge(
-                $result['metadata'],
-                ['feedback' => $feedbackText]
-            )),
+                'thread_session_id' => $session->id,
+                'content' => $content,
+                'word_count' => $wordCount,
             'file_path' => null, // Clear file path so it will be regenerated
         ]);
-        
+
         // Generate PDF
         if ($type === 'resume') {
             $this->pdf->generateResumePDF($document);
         } else {
             $this->pdf->generateCoverLetterPDF($document);
         }
-        
+
+            // Validate the new document
+            $validation = $this->threadManager->validateDocument($content, $type, $jobPost);
+
+            // Update document with validation results
+            $document->update([
+                'rule_compliance' => $validation,
+            ]);
+
         return $document;
+
+        } catch (Exception $e) {
+            Log::error("Document regeneration failed", [
+                'document_id' => $document->id,
+                'type' => $type,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
+        }
     }
 }
