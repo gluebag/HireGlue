@@ -1,0 +1,47 @@
+{
+    "output": {
+        "filePath": "repomix-embeddings.md",
+        "style": "markdown",
+        "parsableStyle": false,
+        "fileSummary": false,
+        "directoryStructure": true,
+        "removeComments": false,
+        "removeEmptyLines": false,
+        "compress": false,
+        "topFilesLength": 5,
+        "showLineNumbers": false,
+        "copyToClipboard": true,
+        "git": {
+            "sortByChanges": true,
+            "sortByChangesMaxCommits": 100
+        }
+    },
+    "include": [
+        "**/app/Models/**",
+        "**/app/Nova/**",
+        "**/app/Providers/**",
+        "**/app/Services/**",
+        "**/database/factories/**",
+        "**/database/migrations/**",
+        "**/database/seeders/**",
+        "**/resources/views/**",
+        "**/routes/**",
+        "**/tests/**",
+        "**/composer.json",
+
+        "**/repomix.config.json"
+
+    ],
+    "ignore": {
+        "useGitignore": true,
+        "useDefaultPatterns": true,
+        "customPatterns": [
+        ]
+    },
+    "security": {
+        "enableSecurityCheck": false
+    },
+    "tokenCount": {
+        "encoding": "o200k_base"
+    }
+}

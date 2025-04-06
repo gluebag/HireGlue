@@ -310,7 +310,7 @@ class PromptEngineeringService
             return [
                 'Problem-Solution' => 'Create a cover letter that identifies a specific challenge mentioned in the job description, then demonstrates how the candidate has solved similar problems in the past.',
 
-                'Company Research' => 'Create a cover letter that demonstrates deep knowledge of the company's mission, recent achievements, or culture, connecting the candidate's values and experience to the company specifically.',
+                'Company Research' => 'Create a cover letter that demonstrates deep knowledge of the company\'s mission, recent achievements, or culture, connecting the candidate\'s values and experience to the company specifically.',
 
                 'Story-Based' => 'Create a narrative-driven cover letter that tells a compelling story about a relevant accomplishment that demonstrates why the candidate is perfect for this role.',
             ];
