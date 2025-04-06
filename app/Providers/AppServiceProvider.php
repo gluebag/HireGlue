@@ -2,16 +2,13 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\ServiceProvider;
 use App\Services\AssistantsService;
 use App\Services\ThreadManagementService;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\ParallelTesting;
-use Illuminate\Support\ServiceProvider;
-use App\Services\RulesService;
-use App\Services\OpenAIService;
-use App\Services\PDFService;
+use App\Services\PromptEngineeringService;
+use App\Services\EmbeddingsService;
 use App\Services\GenerationService;
-use PHPUnit\Framework\TestCase;
+use App\Services\PDFService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -30,19 +27,22 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singleton(PromptEngineeringService::class, function ($app) {
+            return new PromptEngineeringService();
+        });
+
+        $this->app->singleton(EmbeddingsService::class, function ($app) {
+            return new EmbeddingsService();
+        });
+
         $this->app->singleton(GenerationService::class, function ($app) {
             return new GenerationService(
                 $app->make(ThreadManagementService::class),
+                $app->make(PromptEngineeringService::class),
+                $app->make(EmbeddingsService::class),
                 $app->make(PDFService::class)
             );
         });
-//        $this->app->singleton(GenerationService::class, function ($app) {
-//            return new GenerationService(
-//                $app->make(OpenAIService::class),
-//                $app->make(RulesService::class),
-//                $app->make(PDFService::class)
-//            );
-//        });
     }
 
     /**
@@ -50,25 +50,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        ParallelTesting::setUpProcess(function (int $token) {
-            // ...
-        });
-
-        ParallelTesting::setUpTestCase(function (int $token, TestCase $testCase) {
-            // ...
-        });
-
-        // Executed when a test database is created...
-        ParallelTesting::setUpTestDatabase(function (string $database, int $token) {
-            Artisan::call('db:seed');
-        });
-
-        ParallelTesting::tearDownTestCase(function (int $token, TestCase $testCase) {
-            // ...
-        });
-
-        ParallelTesting::tearDownProcess(function (int $token) {
-            // ...
-        });
+        //
     }
 }
