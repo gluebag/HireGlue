@@ -7,8 +7,9 @@
         "directoryStructure": true,
         "removeComments": false,
         "removeEmptyLines": false,
-        "compress": false,
-        "topFilesLength": 5,
+        "compress": true,
+        "topFilesLength": 0,
+
         "showLineNumbers": false,
         "copyToClipboard": true,
         "git": {
@@ -24,13 +25,8 @@
         "**/database/factories/**",
         "**/database/migrations/**",
         "**/database/seeders/**",
-        "**/resources/views/**",
-        "**/routes/**",
-        "**/tests/**",
         "**/composer.json",
-
         "**/repomix.config.json"
-
     ],
     "ignore": {
         "useGitignore": true,
