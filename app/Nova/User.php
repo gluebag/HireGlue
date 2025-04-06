@@ -38,8 +38,10 @@ class User extends Resource
      */
     public function title()
     {
+        // return only first letter of first name + last name
+        return substr($this->first_name, 0, 1) . substr($this->last_name, 0, 1);
         // return full name aka first name + last name
-        return $this->first_name . ' ' . $this->last_name;
+        // return $this->first_name . ' ' . $this->last_name;
     }
 
     public function subtitle()
