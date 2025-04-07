@@ -2,8 +2,10 @@
 
 namespace App\Nova;
 
+use App\Nova\Repeaters\LineItemAchievement;
 use Laravel\Nova\Fields\DateTime;
 use Laravel\Nova\Fields\ID;
+use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Date;
@@ -40,7 +42,7 @@ class Education extends Resource
     /**
      * Get the fields displayed by the resource.
      *
-     * @param  \Laravel\Nova\Http\Requests\NovaRequest  $request
+     * @param \Laravel\Nova\Http\Requests\NovaRequest $request
      * @return array
      */
     public function fields(NovaRequest $request)
@@ -83,11 +85,18 @@ class Education extends Resource
                 ->nullable()
                 ->hideFromIndex(),
 
-            KeyValue::make('Achievements')
-                ->keyLabel('Achievement')
-                ->valueLabel('Description')
+
+            Repeater::make('Achievements', 'achievements')
+                ->repeatables([
+                    LineItemAchievement::make()
+                ])
                 ->nullable()
-                ->hideFromIndex(),
+                ->asJson(),
+//            KeyValue::make('Achievements')
+//                ->keyLabel('Achievement')
+//                ->valueLabel('Description')
+//                ->nullable()
+//                ->hideFromIndex(),
 
             // show the created_at date in the format "DD/MM/YYYY HH:MM AM/PM"
             DateTime::make('Added At', 'created_at')

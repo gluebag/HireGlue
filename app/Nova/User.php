@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use App\Services\PromptEngineeringService;
 use App\Services\ThreadManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -157,7 +158,8 @@ class User extends Resource
                 ]),
 
                 Tab::make('AI Prompts Context', [
-                    Markdown::make('User Profile', function () {
+
+                    Markdown::make('ThreadManagementService - User Profile', function () {
                         $threadService = app(ThreadManagementService::class);
                         return $threadService->formatUserProfile($this->model());
                     })

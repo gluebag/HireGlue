@@ -8,6 +8,7 @@ use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Number;
+use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 class Skill extends Resource
@@ -73,6 +74,11 @@ class Skill extends Resource
                 ->max(10)
                 ->default(0)
                 ->help('Rate your proficiency from 1-10'),
+
+            Textarea::make('Proficiency Reason')
+                ->rows(3)
+                ->alwaysShow()
+                ->help('Explain why you rated your proficiency this way'),
 
             Number::make('Years Experience')
                 ->min(0)
