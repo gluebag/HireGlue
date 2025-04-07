@@ -62,7 +62,7 @@ class EmbeddingsService
                     ['skill_id' => $skill->id],
                     [
                         'user_id' => $user->id,
-                        'embedding' => json_encode($embedding),
+                        'embedding' => $embedding,
                         'skill_description' => $skillDescription,
                     ]
                 );
@@ -139,7 +139,7 @@ class EmbeddingsService
                         'requirement_type' => $type,
                     ],
                     [
-                        'embedding' => json_encode($embedding),
+                        'embedding' => $embedding,
                         'requirement_text' => $requirementText,
                     ]
                 );
@@ -173,7 +173,7 @@ class EmbeddingsService
                     'requirement_type' => 'full_description',
                 ],
                 [
-                    'embedding' => json_encode($embedding),
+                    'embedding' => $embedding,
                     'requirement_text' => $jobPost->job_description,
                 ]
             );
@@ -259,52 +259,64 @@ class EmbeddingsService
     {
         $matches = [];
 
-        // Make sure embeddings exist
-        $this->generateUserSkillEmbeddings($user);
-        $this->generateJobRequirementEmbeddings($jobPost);
+        try {
+            // Make sure embeddings exist
+            $this->generateUserSkillEmbeddings($user);
+            $this->generateJobRequirementEmbeddings($jobPost);
 
-        // Get job requirement embeddings
-        $jobRequirementEmbeddings = JobRequirementEmbedding::where('job_post_id', $jobPost->id)->get();
+            // Get job requirement embeddings
+            $jobRequirementEmbeddings = JobRequirementEmbedding::where('job_post_id', $jobPost->id)->get();
 
-        // Get user skill embeddings
-        $userSkillEmbeddings = SkillEmbedding::where('user_id', $user->id)->get();
+            // Get user skill embeddings
+            $userSkillEmbeddings = SkillEmbedding::where('user_id', $user->id)->get();
 
-        foreach ($jobRequirementEmbeddings as $requirementEmbedding) {
-            $requirementVector = json_decode($requirementEmbedding->embedding, true);
-            $requirementType = $requirementEmbedding->requirement_type;
+            foreach ($jobRequirementEmbeddings as $requirementEmbedding) {
+                $requirementVector = $requirementEmbedding->embedding;
+                $requirementType = $requirementEmbedding->requirement_type;
 
-            $matches[$requirementType] = [];
+                $matches[$requirementType] = [];
 
-            foreach ($userSkillEmbeddings as $skillEmbedding) {
-                $skillVector = json_decode($skillEmbedding->embedding, true);
+                foreach ($userSkillEmbeddings as $skillEmbedding) {
+                    $skillVector = $skillEmbedding->embedding;
 
-                // Calculate cosine similarity
-                $similarity = $this->cosineSimilarity($requirementVector, $skillVector);
+                    // Calculate cosine similarity
+                    $similarity = $this->cosineSimilarity($requirementVector, $skillVector);
 
-                // Get the skill
-                $skill = Skill::find($skillEmbedding->skill_id);
+                    // Get the skill
+                    $skill = Skill::find($skillEmbedding->skill_id);
 
-                $matches[$requirementType][] = [
-                    'skill_id' => $skillEmbedding->skill_id,
-                    'skill_name' => $skill ? $skill->name : 'Unknown',
-                    'similarity' => $similarity,
-                    'proficiency' => $skill ? $skill->proficiency : 0,
-                    'years_experience' => $skill ? $skill->years_experience : 0,
-                ];
+                    $matches[$requirementType][] = [
+                        'skill_id' => $skillEmbedding->skill_id,
+                        'skill_name' => $skill ? $skill->name : 'Unknown',
+                        'similarity' => $similarity,
+                        'proficiency' => $skill ? $skill->proficiency : 0,
+                        'years_experience' => $skill ? $skill->years_experience : 0,
+                    ];
+                }
+
+                // Sort by similarity (highest first)
+                usort($matches[$requirementType], function ($a, $b) {
+                    return $b['similarity'] <=> $a['similarity'];
+                });
+
+                // Keep only top matches (threshold: 0.75)
+                $matches[$requirementType] = array_filter($matches[$requirementType], function ($match) {
+                    return $match['similarity'] >= 0.75;
+                });
             }
-
-            // Sort by similarity (highest first)
-            usort($matches[$requirementType], function ($a, $b) {
-                return $b['similarity'] <=> $a['similarity'];
-            });
-
-            // Keep only top matches (threshold: 0.75)
-            $matches[$requirementType] = array_filter($matches[$requirementType], function ($match) {
-                return $match['similarity'] >= 0.75;
-            });
+            
+            return $matches;
+        } catch (Exception $e) {
+            Log::error("Error in findSkillMatches", [
+                'user_id' => $user->id,
+                'job_post_id' => $jobPost->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            // Return empty matches if an error occurs
+            return [];
         }
-
-        return $matches;
     }
 
     /**
@@ -342,13 +354,55 @@ class EmbeddingsService
      */
     public function generateRecommendations(User $user, JobPost $jobPost): array
     {
-        // Find skill matches
-        $matches = $this->findSkillMatches($user, $jobPost);
-
-        // Prepare data for OpenAI
-        $matchesJson = json_encode($matches, JSON_PRETTY_PRINT);
-
         try {
+            // Find skill matches
+            Log::debug("Starting to find skill matches for recommendations", [
+                'user_id' => $user->id,
+                'job_post_id' => $jobPost->id
+            ]);
+            
+            $matches = $this->findSkillMatches($user, $jobPost);
+            
+            if (empty($matches)) {
+                Log::warning("No skill matches found for recommendations", [
+                    'user_id' => $user->id,
+                    'job_post_id' => $jobPost->id
+                ]);
+                
+                // Return basic recommendations if no matches
+                return [
+                    'key_skills_to_emphasize' => [],
+                    'skills_to_reframe' => [],
+                    'gap_mitigation_strategies' => [],
+                    'achievements_to_highlight' => [],
+                    'keywords_to_include' => [],
+                    'overall_match_assessment' => 'Unable to generate detailed recommendations due to insufficient skill matches.',
+                ];
+            }
+            
+            Log::debug("Skill matches found for recommendations", [
+                'user_id' => $user->id,
+                'job_post_id' => $jobPost->id,
+                'match_count' => count($matches)
+            ]);
+
+            // Prepare data for OpenAI
+            $matchesJson = json_encode($matches, JSON_PRETTY_PRINT);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error("Failed to encode matches as JSON", [
+                    'user_id' => $user->id,
+                    'job_post_id' => $jobPost->id,
+                    'error' => json_last_error_msg()
+                ]);
+                throw new Exception("Failed to encode matches as JSON: " . json_last_error_msg());
+            }
+            
+            Log::debug("Calling OpenAI for skill recommendations", [
+                'user_id' => $user->id,
+                'job_post_id' => $jobPost->id
+            ]);
+
             $response = OpenAI::chat()->create([
                 'model' => 'gpt-4o',
                 'temperature' => 0.4,
@@ -378,22 +432,83 @@ class EmbeddingsService
                     ]
                 ]
             ]);
+            
+            Log::debug("Received response from OpenAI for recommendations", [
+                'user_id' => $user->id,
+                'job_post_id' => $jobPost->id
+            ]);
 
             $content = $response->choices[0]->message->content;
+            
+            Log::debug("Parsing recommendation response content", [
+                'user_id' => $user->id,
+                'job_post_id' => $jobPost->id,
+                'content_length' => strlen($content)
+            ]);
 
-            // Parse JSON response
+            // Try direct decode first
             $recommendations = json_decode($content, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                // If the response isn't valid JSON, try to extract it
-                preg_match('/```json(.*?)```/s', $content, $matches);
+                Log::debug("Direct JSON decode failed, trying to extract JSON from markdown", [
+                    'user_id' => $user->id,
+                    'job_post_id' => $jobPost->id,
+                    'error' => json_last_error_msg()
+                ]);
+                
+                // If the response isn't valid JSON, try to extract it from markdown code blocks
+                preg_match('/```(?:json)?\s*(.*?)\s*```/s', $content, $matches);
+                
                 if (isset($matches[1])) {
-                    $recommendations = json_decode(trim($matches[1]), true);
+                    $jsonContent = trim($matches[1]);
+                    Log::debug("Found JSON content in markdown code block", [
+                        'user_id' => $user->id,
+                        'job_post_id' => $jobPost->id,
+                        'json_length' => strlen($jsonContent)
+                    ]);
+                    
+                    $recommendations = json_decode($jsonContent, true);
+                    
                     if (json_last_error() !== JSON_ERROR_NONE) {
-                        throw new Exception("Failed to parse recommendations JSON");
+                        Log::error("Failed to parse extracted JSON content", [
+                            'user_id' => $user->id,
+                            'job_post_id' => $jobPost->id,
+                            'error' => json_last_error_msg(),
+                            'json_content' => $jsonContent
+                        ]);
+                        throw new Exception("Failed to parse recommendations JSON: " . json_last_error_msg());
                     }
                 } else {
-                    throw new Exception("Failed to parse recommendations JSON");
+                    Log::error("Could not extract JSON content from response", [
+                        'user_id' => $user->id,
+                        'job_post_id' => $jobPost->id,
+                        'content' => $content
+                    ]);
+                    throw new Exception("Failed to extract recommendations JSON from response");
+                }
+            }
+            
+            Log::debug("Successfully parsed recommendations", [
+                'user_id' => $user->id,
+                'job_post_id' => $jobPost->id,
+                'recommendation_count' => count($recommendations)
+            ]);
+
+            // Ensure all expected fields exist
+            $expectedFields = [
+                'key_skills_to_emphasize', 
+                'skills_to_reframe', 
+                'gap_mitigation_strategies',
+                'achievements_to_highlight', 
+                'keywords_to_include', 
+                'overall_match_assessment'
+            ];
+            
+            foreach ($expectedFields as $field) {
+                if (!isset($recommendations[$field])) {
+                    $recommendations[$field] = $field === 'overall_match_assessment' 
+                        ? 'No assessment provided.' 
+                        : [];
                 }
             }
 
@@ -404,6 +519,7 @@ class EmbeddingsService
                 'user_id' => $user->id,
                 'job_post_id' => $jobPost->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // Return basic recommendations if generation fails
@@ -413,7 +529,7 @@ class EmbeddingsService
                 'gap_mitigation_strategies' => [],
                 'achievements_to_highlight' => [],
                 'keywords_to_include' => [],
-                'overall_match_assessment' => 'Unable to generate detailed recommendations.',
+                'overall_match_assessment' => 'Unable to generate detailed recommendations due to a technical issue.',
             ];
         }
     }
