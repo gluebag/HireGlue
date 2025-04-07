@@ -4,6 +4,7 @@ namespace App\Nova\Actions;
 
 use App\Services\GenerationService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Collection;
 use Laravel\Nova\Actions\Action;
@@ -11,7 +12,7 @@ use Laravel\Nova\Fields\ActionFields;
 use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
-class RegenerateWithFeedback extends Action
+class RegenerateWithFeedback extends Action implements ShouldQueue
 {
     use InteractsWithQueue, Queueable;
 
@@ -31,7 +32,7 @@ class RegenerateWithFeedback extends Action
                 $regenerated = $generationService->regenerateWithFeedback($document, [
                     'feedback' => $fields->feedback
                 ]);
-                
+
                 return Action::message("Document regenerated successfully!");
             } catch (\Exception $e) {
                 return Action::danger("Failed to regenerate document: {$e->getMessage()}");

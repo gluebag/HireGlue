@@ -4,13 +4,14 @@ namespace App\Nova\Actions;
 
 use App\Services\GenerationService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Collection;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\ActionFields;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
-class GenerateApplicationMaterials extends Action
+class GenerateApplicationMaterials extends Action implements ShouldQueue
 {
     use InteractsWithQueue, Queueable;
 
@@ -29,7 +30,7 @@ class GenerateApplicationMaterials extends Action
             try {
                 $resume = $generationService->generateResume($jobPost);
                 $coverLetter = $generationService->generateCoverLetter($jobPost);
-                
+
                 return Action::message("Resume (ID: {$resume->id}) and Cover Letter (ID: {$coverLetter->id}) generated successfully!");
             } catch (\Exception $e) {
                 return Action::danger("Failed to generate application materials: {$e->getMessage()}");

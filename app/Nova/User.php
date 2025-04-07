@@ -2,16 +2,19 @@
 
 namespace App\Nova;
 
+use App\Services\ThreadManagementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Laravel\Nova\Auth\PasswordValidationRules;
 use Laravel\Nova\Fields\Gravatar;
 use Laravel\Nova\Fields\ID;
+use Laravel\Nova\Fields\Markdown;
 use Laravel\Nova\Fields\Password;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Date;
 use Laravel\Nova\Fields\HasMany;
 use Laravel\Nova\Http\Requests\NovaRequest;
+use Laravel\Nova\Tabs\Tab;
 
 class User extends Resource
 {
@@ -87,76 +90,94 @@ class User extends Resource
     {
         return [
             ID::make()->sortable(),
+            Tab::group(fields: [
+                Tab::make('Details', [
 
-            Gravatar::make()
-                ->maxWidth(50),
+                    Gravatar::make()
+                        ->maxWidth(50),
 
-            Text::make('First Name')
-                ->sortable()
-                ->rules('required', 'max:255'),
+                    Text::make('First Name')
+                        ->sortable()
+                        ->rules('required', 'max:255'),
 
-            Text::make('Last Name')
-                ->sortable()
-                ->rules('required', 'max:255'),
+                    Text::make('Last Name')
+                        ->sortable()
+                        ->rules('required', 'max:255'),
 
-            Text::make('Name', function () {
-                return $this->first_name . ' ' . $this->last_name;
-            })->onlyOnIndex(),
+                    Text::make('Name', function () {
+                        return $this->first_name . ' ' . $this->last_name;
+                    })->onlyOnIndex(),
 
-            Text::make('Email')
-                ->sortable()
-                ->rules('required', 'email', 'max:254')
-                ->creationRules('unique:users,email')
-                ->updateRules('unique:users,email,{{resourceId}}'),
+                    Text::make('Email')
+                        ->sortable()
+                        ->rules('required', 'email', 'max:254')
+                        ->creationRules('unique:users,email')
+                        ->updateRules('unique:users,email,{{resourceId}}'),
 
-            Password::make('Password')
-                ->onlyOnForms()
-                ->creationRules($this->passwordRules())
-                ->updateRules($this->optionalPasswordRules()),
+                    Password::make('Password')
+                        ->onlyOnForms()
+                        ->creationRules($this->passwordRules())
+                        ->updateRules($this->optionalPasswordRules()),
 
-            Date::make('Date of Birth')->nullable(),
+                    Date::make('Date of Birth')->nullable(),
 
-            Text::make('Phone Number')->nullable(),
+                    Text::make('Phone Number')->nullable(),
 
-            Text::make('Location')->nullable(),
+                    Text::make('Location')->nullable(),
 
-            Text::make('LinkedIn', 'linkedin_url')
-                // ->hideFromIndex()
-                ->displayUsing(function ($value) {
-                    $username = Str::after($value, 'linkedin.com/in/');
-                    $username = Str::before($username, '/');
-                    return "<a href='{$value}' target='_blank'>@{$username}</a>";
-                })
-                ->asHtml()
-                ->nullable(),
+                    Text::make('LinkedIn', 'linkedin_url')
+                        // ->hideFromIndex()
+                        ->displayUsing(function ($value) {
+                            $username = Str::after($value, 'linkedin.com/in/');
+                            $username = Str::before($username, '/');
+                            return "<a href='{$value}' target='_blank'>@{$username}</a>";
+                        })
+                        ->asHtml()
+                        ->nullable(),
 
-            Text::make('GitHub', 'github_url')
-                // ->hideFromIndex()
-                ->displayUsing(function ($value) {
-                    $username = Str::after($value, 'github.com/');
-                    $username = Str::before($username, '/');
-                    return "<a href='{$value}' target='_blank'>@{$username}</a>";
-                })
-                ->asHtml()
-                ->nullable(),
+                    Text::make('GitHub', 'github_url')
+                        // ->hideFromIndex()
+                        ->displayUsing(function ($value) {
+                            $username = Str::after($value, 'github.com/');
+                            $username = Str::before($username, '/');
+                            return "<a href='{$value}' target='_blank'>@{$username}</a>";
+                        })
+                        ->asHtml()
+                        ->nullable(),
 
-            Text::make('Personal Website URL')
-                ->hideFromIndex()
-                ->copyable()
-                ->nullable(),
+                    Text::make('Personal Website URL')
+                        ->hideFromIndex()
+                        ->copyable()
+                        ->nullable(),
 
-            Text::make('Portfolio URL')
-                 ->hideFromIndex()
-                ->copyable()
-                ->nullable(),
+                    Text::make('Portfolio URL')
+                        ->hideFromIndex()
+                        ->copyable()
+                        ->nullable(),
+                ]),
 
-            HasMany::make('Work Experiences', 'workExperiences', WorkExperience::class),
-            HasMany::make('Education', 'education', Education::class),
-            HasMany::make('Skills', 'skills', Skill::class),
-            HasMany::make('Projects', 'projects', Project::class),
-            HasMany::make('Job Posts', 'jobPosts', JobPost::class),
-            HasMany::make('Resumes', 'resumes', Resume::class),
-            HasMany::make('Cover Letters', 'coverLetters', CoverLetter::class),
+                Tab::make('AI Prompts Context', [
+                    Markdown::make('User Profile', function () {
+                        $threadService = app(ThreadManagementService::class);
+                        return $threadService->formatUserProfile($this->model());
+                    })
+                        ->help('This is the context that will be used in the AI prompts.')
+                        ->alwaysShow()
+                        ->preset('commonmark'),
+                ])
+            ]),
+
+            Tab::group('Relations', [
+                HasMany::make('Work Experiences', 'workExperiences', WorkExperience::class),
+                HasMany::make('Education', 'education', Education::class),
+                HasMany::make('Skills', 'skills', Skill::class),
+                HasMany::make('Projects', 'projects', Project::class),
+                HasMany::make('Job Posts', 'jobPosts', JobPost::class),
+                HasMany::make('Resumes', 'resumes', Resume::class),
+                HasMany::make('Cover Letters', 'coverLetters', CoverLetter::class),
+            ]),
+
+
         ];
     }
 

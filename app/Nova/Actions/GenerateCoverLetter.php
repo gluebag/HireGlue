@@ -4,13 +4,14 @@ namespace App\Nova\Actions;
 
 use App\Services\GenerationService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Collection;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\ActionFields;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
-class GenerateCoverLetter extends Action
+class GenerateCoverLetter extends Action implements ShouldQueue
 {
     use InteractsWithQueue, Queueable;
 
@@ -28,7 +29,7 @@ class GenerateCoverLetter extends Action
         foreach ($models as $jobPost) {
             try {
                 $coverLetter = $generationService->generateCoverLetter($jobPost);
-                
+
                 return Action::message("Cover letter generated successfully! ID: {$coverLetter->id}");
             } catch (\Exception $e) {
                 return Action::danger("Failed to generate cover letter: {$e->getMessage()}");

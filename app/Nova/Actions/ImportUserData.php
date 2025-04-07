@@ -107,7 +107,7 @@ class ImportUserData extends Action
 
                 // Check if file exists before trying to read it
                 if (!file_exists($uploadedFile->getRealPath())) {
-                    \Log::error('Resume file not found at expected location', [
+                    Log::error('Resume file not found at expected location', [
                         'full_path' => $uploadedFile->getRealPath(),
                         'user_id' => Auth::id(),
                         'file_name' => $uploadedFile->getClientOriginalName(),

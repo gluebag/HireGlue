@@ -4,13 +4,14 @@ namespace App\Nova\Actions;
 
 use App\Services\GenerationService;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Collection;
 use Laravel\Nova\Actions\Action;
 use Laravel\Nova\Fields\ActionFields;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
-class GenerateResume extends Action
+class GenerateResume extends Action implements ShouldQueue
 {
     use InteractsWithQueue, Queueable;
 
@@ -28,7 +29,7 @@ class GenerateResume extends Action
         foreach ($models as $jobPost) {
             try {
                 $resume = $generationService->generateResume($jobPost);
-                
+
                 return Action::message("Resume generated successfully! ID: {$resume->id}");
             } catch (\Exception $e) {
                 return Action::danger("Failed to generate resume: {$e->getMessage()}");
