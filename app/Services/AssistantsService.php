@@ -15,14 +15,14 @@ class AssistantsService
     const TYPE_RESUME = 'resume';
     const TYPE_COVER_LETTER = 'cover_letter';
     const TYPE_VALIDATOR = 'validator';
-    
+
     /**
      * Cache keys for storing assistant IDs
      */
     const CACHE_KEY_RESUME = 'openai_assistant_resume';
     const CACHE_KEY_COVER_LETTER = 'openai_assistant_cover_letter';
     const CACHE_KEY_VALIDATOR = 'openai_assistant_validator';
-    
+
     /**
      * Get or create an assistant by type
      *
@@ -32,7 +32,7 @@ class AssistantsService
     public function getOrCreateAssistant(string $type): string
     {
         $cacheKey = $this->getCacheKeyForType($type);
-        
+
         return Cache::remember($cacheKey, now()->addDays(30), function () use ($type) {
             try {
                 $assistantId = $this->createAssistant($type);
@@ -47,7 +47,7 @@ class AssistantsService
             }
         });
     }
-    
+
     /**
      * Create a new assistant with the appropriate configuration
      *
@@ -57,17 +57,30 @@ class AssistantsService
     private function createAssistant(string $type): string
     {
         $config = $this->getAssistantConfig($type);
-        
-        $response = OpenAI::assistants()->create([
+        $aiHttpParameters = [
             'name' => $config['name'],
             'instructions' => $config['instructions'],
             'tools' => $config['tools'],
             'model' => $config['model'] ?? 'gpt-4o',
+        ];
+        Log::debug("Creating OpenAI assistant", [
+            'type' => $type,
+            'ai_http_parameters' => $aiHttpParameters,
         ]);
-        
+
+        $response = OpenAI::assistants()->create($aiHttpParameters);
+
+        Log::debug("OpenAI assistant created successfully", [
+            'type' => $type,
+            'ai_http_parameters' => $aiHttpParameters,
+            'assistant_id' => $response->id,
+            'created_at' => $response->createdAt,
+            'full_http_response' => $response->toArray()
+        ]);
+
         return $response->id;
     }
-    
+
     /**
      * Get the configuration for a specific assistant type
      *
@@ -81,7 +94,7 @@ class AssistantsService
                 'name' => 'Resume Generator',
                 'instructions' => $this->getResumeInstructions(),
                 'tools' => [
-                    ['type' => 'retrieval'],
+                    ['type' => 'file_search'],
                     ['type' => 'code_interpreter'],
                 ],
                 'model' => 'gpt-4o',
@@ -90,7 +103,7 @@ class AssistantsService
                 'name' => 'Cover Letter Generator',
                 'instructions' => $this->getCoverLetterInstructions(),
                 'tools' => [
-                    ['type' => 'retrieval'],
+                    ['type' => 'file_search'],
                     ['type' => 'code_interpreter'],
                 ],
                 'model' => 'gpt-4o',
@@ -99,7 +112,7 @@ class AssistantsService
                 'name' => 'Document Validator',
                 'instructions' => $this->getValidatorInstructions(),
                 'tools' => [
-                    ['type' => 'retrieval'],
+                    ['type' => 'file_search'],
                     ['type' => 'code_interpreter'],
                     ['type' => 'function'],
                 ],
@@ -108,7 +121,7 @@ class AssistantsService
             default => throw new Exception("Unknown assistant type: {$type}")
         };
     }
-    
+
     /**
      * Get cache key for the assistant type
      */
@@ -121,7 +134,7 @@ class AssistantsService
             default => throw new Exception("Unknown assistant type: {$type}")
         };
     }
-    
+
     /**
      * Get detailed instructions for the resume assistant
      */
@@ -154,7 +167,7 @@ Always follow these formatting rules:
 Focus on making the candidate appear as the perfect "puzzle piece" to fill the team's current gaps.
 EOT;
     }
-    
+
     /**
      * Get detailed instructions for the cover letter assistant
      */
@@ -187,7 +200,7 @@ Always follow these best practices:
 Focus on creating an emotional connection and positioning the candidate as the solution to the company's needs.
 EOT;
     }
-    
+
     /**
      * Get detailed instructions for the validator assistant
      */
@@ -218,7 +231,7 @@ For each validation check, provide:
 The validation will be comprehensive and actionable, providing specific feedback that can be used to improve the document before submission.
 EOT;
     }
-    
+
     /**
      * Create a new thread for an assistant interaction
      *
@@ -226,10 +239,18 @@ EOT;
      */
     public function createThread(): string
     {
+        Log::debug("Creating new OpenAI thread");
+
         $response = OpenAI::threads()->create([]);
+
+        Log::debug("OpenAI thread created successfully", [
+            'thread_id' => $response->id,
+            'created_at' => $response->createdAt
+        ]);
+
         return $response->id;
     }
-    
+
     /**
      * Add a message to a thread
      *
@@ -244,16 +265,33 @@ EOT;
             'role' => 'user',
             'content' => $content,
         ];
-        
+
         if (!empty($files)) {
             $params['file_ids'] = $files;
         }
-        
+
+        Log::debug("Adding message to OpenAI thread", [
+            'thread_id' => $threadId,
+            'role' => 'user',
+            'content' => $content,
+            'content_length' => strlen($content),
+            'has_files' => !empty($files),
+            'file_count' => count($files),
+            'file_ids' => $files,
+        ]);
+
         $response = OpenAI::threads()->messages()->create($threadId, $params);
-        
+
+        Log::debug("Message added to OpenAI thread successfully", [
+            'thread_id' => $threadId,
+            'message_id' => $response->id,
+            'created_at' => $response->createdAt,
+
+        ]);
+
         return $response->id;
     }
-    
+
     /**
      * Run an assistant on a thread and wait for completion
      *
@@ -265,36 +303,89 @@ EOT;
     public function runAssistant(string $threadId, string $assistantId, array $instructions = []): array
     {
         // Create the run
+        Log::debug("Running OpenAI assistant on thread", [
+            'thread_id' => $threadId,
+            'assistant_id' => $assistantId,
+            'has_instructions' => isset($instructions['instructions']),
+        ]);
+
         $run = OpenAI::threads()->runs()->create($threadId, [
             'assistant_id' => $assistantId,
             'instructions' => $instructions['instructions'] ?? null,
         ]);
-        
+
+        Log::debug("OpenAI run created", [
+            'thread_id' => $threadId,
+            'run_id' => $run->id,
+            'status' => $run->status,
+        ]);
+
         // Poll for completion (in production, you'd use a background job)
         $maxAttempts = 60; // 10 minutes max (10s intervals)
         $attempts = 0;
-        
+
         do {
             sleep(10); // Wait 10 seconds between checks
+
+            Log::debug("Checking OpenAI run status", [
+                'thread_id' => $threadId,
+                'run_id' => $run->id,
+                'attempt' => $attempts + 1,
+                'max_attempts' => $maxAttempts,
+            ]);
+
             $run = OpenAI::threads()->runs()->retrieve($threadId, $run->id);
+
+            Log::debug("OpenAI run status update", [
+                'thread_id' => $threadId,
+                'run_id' => $run->id,
+                'status' => $run->status,
+                'attempt' => $attempts + 1,
+            ]);
+
             $attempts++;
-            
+
             // Handle required actions if needed (function calling, etc.)
             if ($run->status === 'requires_action') {
+                Log::debug("OpenAI run requires action", [
+                    'thread_id' => $threadId,
+                    'run_id' => $run->id,
+                    'action_type' => $run->requiredAction->type ?? 'unknown',
+                ]);
+
                 // Process required actions (would need implementation based on your functions)
                 // This is a simplified example
                 $this->handleRequiredAction($threadId, $run);
             }
-            
+
         } while ($run->status !== 'completed' && $run->status !== 'failed' && $attempts < $maxAttempts);
-        
+
         if ($run->status !== 'completed') {
+            Log::error("OpenAI run failed or timed out", [
+                'thread_id' => $threadId,
+                'run_id' => $run->id,
+                'status' => $run->status,
+                'attempts' => $attempts,
+            ]);
+
             throw new Exception("Assistant run failed or timed out: {$run->status}");
         }
-        
+
+        Log::debug("OpenAI run completed successfully", [
+            'thread_id' => $threadId,
+            'run_id' => $run->id,
+            'attempts' => $attempts,
+            'total_time' => ($attempts * 10) . ' seconds',
+        ]);
+
         // Get the messages (newest first)
+        Log::debug("Retrieving messages from completed OpenAI run", [
+            'thread_id' => $threadId,
+            'run_id' => $run->id,
+        ]);
+
         $messages = OpenAI::threads()->messages()->list($threadId, ['limit' => 10]);
-        
+
         // Filter to only get assistant messages from this run
         $responseMessages = [];
         foreach ($messages->data as $message) {
@@ -302,10 +393,16 @@ EOT;
                 $responseMessages[] = $message;
             }
         }
-        
+
+        Log::debug("Retrieved assistant messages from OpenAI run", [
+            'thread_id' => $threadId,
+            'run_id' => $run->id,
+            'message_count' => count($responseMessages),
+        ]);
+
         return $responseMessages;
     }
-    
+
     /**
      * Handle required actions for function calling
      *
@@ -316,31 +413,69 @@ EOT;
     private function handleRequiredAction(string $threadId, object $run): void
     {
         if ($run->requiredAction->type !== 'submit_tool_outputs') {
+            Log::debug("Skipping required action - not a tool output submission", [
+                'thread_id' => $threadId,
+                'run_id' => $run->id,
+                'action_type' => $run->requiredAction->type ?? 'unknown',
+            ]);
             return;
         }
-        
+
         $toolOutputs = [];
-        
+
+        Log::debug("Processing required tool outputs for OpenAI run", [
+            'thread_id' => $threadId,
+            'run_id' => $run->id,
+            'tool_calls_count' => count($run->requiredAction->submitToolOutputs->toolCalls ?? []),
+        ]);
+
         foreach ($run->requiredAction->submitToolOutputs->toolCalls as $toolCall) {
             // Example implementation - would need to be adapted to your specific functions
             $function = $toolCall->function->name;
             $arguments = json_decode($toolCall->function->arguments, true);
-            
+
+            Log::debug("Executing function for OpenAI tool call", [
+                'thread_id' => $threadId,
+                'run_id' => $run->id,
+                'tool_call_id' => $toolCall->id,
+                'function' => $function,
+                'arguments' => $arguments,
+            ]);
+
             // Call your function handling logic here
             $result = $this->callFunction($function, $arguments);
-            
+
+            Log::debug("Function execution completed for OpenAI tool call", [
+                'thread_id' => $threadId,
+                'run_id' => $run->id,
+                'tool_call_id' => $toolCall->id,
+                'function' => $function,
+                'result' => $result,
+            ]);
+
             $toolOutputs[] = [
                 'tool_call_id' => $toolCall->id,
                 'output' => json_encode($result),
             ];
         }
-        
+
+        Log::debug("Submitting tool outputs for OpenAI run", [
+            'thread_id' => $threadId,
+            'run_id' => $run->id,
+            'output_count' => count($toolOutputs),
+        ]);
+
         // Submit the tool outputs
         OpenAI::threads()->runs()->submitToolOutputs($threadId, $run->id, [
             'tool_outputs' => $toolOutputs,
         ]);
+
+        Log::debug("Tool outputs submitted for OpenAI run", [
+            'thread_id' => $threadId,
+            'run_id' => $run->id,
+        ]);
     }
-    
+
     /**
      * Call a function based on name and arguments
      *
