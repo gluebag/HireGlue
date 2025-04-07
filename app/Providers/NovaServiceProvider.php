@@ -2,7 +2,8 @@
 
 namespace App\Providers;
 
-use App\Models\User;
+use App\Models\User as ModelsUser;
+use App\Nova\User;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Fortify\Features;
 use Laravel\Nova\Nova;
@@ -10,6 +11,16 @@ use Laravel\Nova\NovaApplicationServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Log;
+use App\Nova\WorkExperience;
+use App\Nova\Education;
+use App\Nova\Skill;
+use App\Nova\Project;
+use App\Nova\JobPost;
+use App\Nova\Resume;
+use App\Nova\CoverLetter;
+use App\Nova\ThreadSession;
+use App\Nova\OpenAIPrompt;
+use App\Nova\Rule;
 
 class NovaServiceProvider extends NovaApplicationServiceProvider
 {
@@ -22,6 +33,11 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
 
         Nova::withBreadcrumbs();
 
+        Nova::userTimezone(function (Request $request) {
+            return 'America/New_York';
+            // return $request->user()?->timezone;
+        });
+
         Nova::footer(function (Request $request) {
             return Blade::render('
                 <div class="mt-8 leading-normal text-xs text-gray-500 space-y-1">
@@ -29,6 +45,35 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
                     <p class="text-center text-xxs">Powered by <a class="link-default" href="https://nova.laravel.com">Laravel Nova</a> · v5.4.3 (Silver Surfer)</p>
                 </div>
             ');
+        });
+
+        Nova::mainMenu(function (Request $request) {
+            return [
+                \Laravel\Nova\Menu\MenuItem::dashboard(\App\Nova\Dashboards\Main::class),
+
+                \Laravel\Nova\Menu\MenuSection::make('User Profile', [
+                    \Laravel\Nova\Menu\MenuItem::resource(User::class),
+                    \Laravel\Nova\Menu\MenuItem::resource(Education::class),
+                    \Laravel\Nova\Menu\MenuItem::resource(Skill::class),
+                    \Laravel\Nova\Menu\MenuItem::resource(Project::class),
+                    \Laravel\Nova\Menu\MenuItem::resource(WorkExperience::class),
+                ])->icon('user')->collapsable(),
+
+                \Laravel\Nova\Menu\MenuSection::make('Job Applications', [
+                    \Laravel\Nova\Menu\MenuItem::resource(JobPost::class),
+                    \Laravel\Nova\Menu\MenuItem::resource(Resume::class),
+                    \Laravel\Nova\Menu\MenuItem::resource(CoverLetter::class),
+                ])->icon('document-text')->collapsable(),
+
+                \Laravel\Nova\Menu\MenuSection::make('AI Tools', [
+                    \Laravel\Nova\Menu\MenuItem::resource(ThreadSession::class),
+                    \Laravel\Nova\Menu\MenuItem::resource(OpenAIPrompt::class),
+                ])->icon('sparkles')->collapsable(),
+
+                \Laravel\Nova\Menu\MenuSection::make('Configuration', [
+                    \Laravel\Nova\Menu\MenuItem::resource(Rule::class),
+                ])->icon('cog')->collapsable(),
+            ];
         });
     }
 
@@ -65,7 +110,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
      */
     protected function gate(): void
     {
-        Gate::define('viewNova', function (User $user) {
+        Gate::define('viewNova', function (ModelsUser $user) {
             return true;
 
 //            return in_array($user->email, [
