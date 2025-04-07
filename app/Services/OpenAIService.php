@@ -50,7 +50,7 @@ class OpenAIService
      * @return array
      * @throws Exception
      */
-    public function generateResume(JobPost $jobPost, User $user, ?string $promptName = null, array $extraContext = [])
+    public function generateResumeLegacy(JobPost $jobPost, User $user, ?string $promptName = null, array $extraContext = [])
     {
         $promptName = $promptName ?? 'resume_generation';
         $prompt = $this->getPrompt($promptName);
@@ -107,7 +107,7 @@ class OpenAIService
      * @return array
      * @throws Exception
      */
-    public function generateCoverLetter(JobPost $jobPost, User $user, ?string $promptName = null, array $extraContext = [])
+    public function generateCoverLetterLegacy(JobPost $jobPost, User $user, ?string $promptName = null, array $extraContext = [])
     {
         $promptName = $promptName ?? 'cover_letter_generation';
         $prompt = $this->getPrompt($promptName);
@@ -163,7 +163,7 @@ class OpenAIService
      * @return array
      * @throws Exception
      */
-    public function checkRuleCompliance(string $content, string $type, $rules)
+    public function checkRuleComplianceLegacy(string $content, string $type, $rules)
     {
         $prompt = $this->getPrompt('rule_compliance_check');
 
