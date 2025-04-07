@@ -624,7 +624,7 @@ tailored to specific job postings.
           $user = $jobPost->user;
           
           // Generate content with OpenAI
-          $result = $this->openAI->generateResume($jobPost, $user);
+          $result = $this->openAI->generateResumeLegacy($jobPost, $user);
           
           // Validate against rules
           $compliance = $this->rules->validateContent(

@@ -17,6 +17,15 @@ class SkillEmbedding extends Model
     ];
 
     /**
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'embedding' => 'array',
+    ];
+
+    /**
      * Get the user that owns the skill embedding.
      */
     public function user()

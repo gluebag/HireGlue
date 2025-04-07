@@ -27,22 +27,22 @@ class OpenAIServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Mock the RulesService
         $this->rulesServiceMock = Mockery::mock(RulesService::class);
         $this->rulesServiceMock->shouldReceive('getAllRules')
             ->andReturn(collect([]));
-        
+
         $this->openAIService = new OpenAIService($this->rulesServiceMock);
-        
+
         // Create test user
         $this->user = User::factory()->create();
-        
+
         // Create test job post
         $this->jobPost = JobPost::factory()->create([
             'user_id' => $this->user->id
         ]);
-        
+
         // Create test prompt
         $this->prompt = OpenAIPrompt::create([
             'name' => 'resume_generation',
@@ -54,7 +54,7 @@ class OpenAIServiceTest extends TestCase
             'temperature' => 0.7,
             'active' => true
         ]);
-        
+
         OpenAIPrompt::create([
             'name' => 'cover_letter_generation',
             'type' => 'cover_letter',
@@ -81,21 +81,21 @@ class OpenAIServiceTest extends TestCase
             $this->prompt->model,
             ['prompt_tokens' => 100, 'completion_tokens' => 200, 'total_tokens' => 300]
         );
-        
+
         Mockery::mock('alias:OpenAI\Laravel\Facades\OpenAI')
             ->shouldReceive('chat->create')
             ->once()
             ->andReturn($mockResponse);
-        
-        $result = $this->openAIService->generateResume($this->jobPost, $this->user);
-        
+
+        $result = $this->openAIService->generateResumeLegacy($this->jobPost, $this->user);
+
         $this->assertIsArray($result);
         $this->assertArrayHasKey('content', $result);
         $this->assertArrayHasKey('metadata', $result);
         $this->assertEquals('This is a generated resume content', $result['content']);
         $this->assertEquals($this->prompt->model, $result['metadata']['model']);
     }
-    
+
     public function test_can_generate_cover_letter()
     {
         // Mock the OpenAI response
@@ -104,20 +104,20 @@ class OpenAIServiceTest extends TestCase
             'gpt-4o',
             ['prompt_tokens' => 100, 'completion_tokens' => 200, 'total_tokens' => 300]
         );
-        
+
         Mockery::mock('alias:OpenAI\Laravel\Facades\OpenAI')
             ->shouldReceive('chat->create')
             ->once()
             ->andReturn($mockResponse);
-        
-        $result = $this->openAIService->generateCoverLetter($this->jobPost, $this->user);
-        
+
+        $result = $this->openAIService->generateCoverLetterLegacy($this->jobPost, $this->user);
+
         $this->assertIsArray($result);
         $this->assertArrayHasKey('content', $result);
         $this->assertArrayHasKey('metadata', $result);
         $this->assertEquals('This is a generated cover letter content', $result['content']);
     }
-    
+
     public function test_can_generate_with_feedback()
     {
         // Mock the OpenAI response
@@ -126,26 +126,26 @@ class OpenAIServiceTest extends TestCase
             'gpt-4o',
             ['prompt_tokens' => 150, 'completion_tokens' => 250, 'total_tokens' => 400]
         );
-        
+
         Mockery::mock('alias:OpenAI\Laravel\Facades\OpenAI')
             ->shouldReceive('chat->create')
             ->once()
             ->andReturn($mockResponse);
-        
-        $result = $this->openAIService->generateResume(
-            $this->jobPost, 
-            $this->user, 
-            null, 
+
+        $result = $this->openAIService->generateResumeLegacy(
+            $this->jobPost,
+            $this->user,
+            null,
             ['feedback' => 'Please make it more professional']
         );
-        
+
         $this->assertIsArray($result);
         $this->assertArrayHasKey('content', $result);
         $this->assertArrayHasKey('metadata', $result);
         $this->assertEquals('This is a regenerated content with feedback', $result['content']);
         $this->assertEquals(['feedback' => 'Please make it more professional'], $result['metadata']['extra_context']);
     }
-    
+
     /**
      * Create a mock OpenAI API response
      */
@@ -153,15 +153,15 @@ class OpenAIServiceTest extends TestCase
     {
         $mockUsage = Mockery::mock();
         $mockUsage->shouldReceive('toArray')->andReturn($usage);
-        
+
         $mockChoice = Mockery::mock();
         $mockChoice->message = Mockery::mock();
         $mockChoice->message->content = $content;
-        
+
         $mockResponse = Mockery::mock();
         $mockResponse->choices = [$mockChoice];
         $mockResponse->usage = $mockUsage;
-        
+
         return $mockResponse;
     }
 }

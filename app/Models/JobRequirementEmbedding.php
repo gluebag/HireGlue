@@ -17,6 +17,15 @@ class JobRequirementEmbedding extends Model
     ];
 
     /**
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'embedding' => 'array',
+    ];
+
+    /**
      * Get the job post that the embedding is for.
      */
     public function jobPost()

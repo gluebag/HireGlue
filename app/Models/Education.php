@@ -25,8 +25,25 @@ class Education extends Model
         'achievements' => 'array'
     ];
 
+    protected $appends = ['achievements_breakdown'];
+
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function getAchievementsBreakdownAttribute()
+    {
+        // convert the storage format which is Repeatable line-item to basic array
+        // e.g. input format is: [{"type":"line-item-achievement","fields":{"description":"Began self-teaching...."}},{"type":"line-item-achievement","fields":{"description":"Launched PopSheets.com, a website h...s"}}]
+
+        // e.g. output should be just string array of descriptions
+        // e.g. ["Began self-teaching....", "Launched PopSheets.com, a website h...s"]
+        return collect($this->achievements)
+            ->map(function ($item) {
+                return $item['fields']['description'] ?? null;
+            })
+            ->filter()
+            ->all();
     }
 }

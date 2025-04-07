@@ -33,25 +33,25 @@ class GenerationServiceTest extends TestCase
         $this->openAIServiceMock = Mockery::mock(OpenAIService::class);
         $this->rulesServiceMock = Mockery::mock(RulesService::class);
         $this->pdfServiceMock = Mockery::mock(PDFService::class);
-        
+
         // Fix: Create the service with correct property names
         $this->generationService = new GenerationService(
             $this->openAIServiceMock,
             $this->rulesServiceMock,
             $this->pdfServiceMock
         );
-        
+
         // Inject the mocks into the service with reflection to match property names
         $reflection = new \ReflectionClass($this->generationService);
-        
+
         $openAIProp = $reflection->getProperty('openAI');
         $openAIProp->setAccessible(true);
         $openAIProp->setValue($this->generationService, $this->openAIServiceMock);
-        
+
         $rulesProp = $reflection->getProperty('rules');
         $rulesProp->setAccessible(true);
         $rulesProp->setValue($this->generationService, $this->rulesServiceMock);
-        
+
         $pdfProp = $reflection->getProperty('pdf');
         $pdfProp->setAccessible(true);
         $pdfProp->setValue($this->generationService, $this->pdfServiceMock);
@@ -74,7 +74,7 @@ class GenerationServiceTest extends TestCase
     public function test_can_generate_resume()
     {
         // Set up expectations for the mocks
-        $this->openAIServiceMock->shouldReceive('generateResume')
+        $this->openAIServiceMock->shouldReceive('generateResumeLegacy')
             ->once()
             ->with(Mockery::type(JobPost::class), Mockery::type(User::class), null, [])
             ->andReturn([
@@ -101,7 +101,7 @@ class GenerationServiceTest extends TestCase
     public function test_can_generate_cover_letter()
     {
         // Set up expectations for the mocks
-        $this->openAIServiceMock->shouldReceive('generateCoverLetter')
+        $this->openAIServiceMock->shouldReceive('generateCoverLetterLegacy')
             ->once()
             ->with(Mockery::on(function ($job) {
                 return $job instanceof JobPost;
@@ -139,11 +139,11 @@ class GenerationServiceTest extends TestCase
         ]);
 
         // Set up expectations for the mocks
-        $this->openAIServiceMock->shouldReceive('generateResume')
+        $this->openAIServiceMock->shouldReceive('generateResumeLegacy')
             ->once()
             ->withArgs(function ($jobPost, $user, $promptName, $extraContext) {
                 return $jobPost instanceof JobPost &&
-                       $user instanceof User && 
+                       $user instanceof User &&
                        $extraContext['feedback'] === 'Make it better' &&
                        $extraContext['previous_content'] === 'Original resume content';
             })
