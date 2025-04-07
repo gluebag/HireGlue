@@ -35,7 +35,7 @@ class OpenAIPrompt extends Resource
      */
     public static function label()
     {
-        return 'OpenAI Prompts';
+        return 'Prompts';
     }
 
     /**
@@ -45,7 +45,7 @@ class OpenAIPrompt extends Resource
      */
     public static function singularLabel()
     {
-        return 'OpenAI Prompt';
+        return 'AI Prompt';
     }
 
     /**

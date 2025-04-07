@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use Laravel\Nova\Fields\DateTime;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Textarea;
@@ -69,6 +70,7 @@ class Resume extends Resource
             ID::make()->sortable(),
 
             BelongsTo::make('User')
+                ->hideFromIndex()
                 ->default($request->user()->id)
                 ->withoutTrashed()
                 ->searchable(),
@@ -118,6 +120,10 @@ class Resume extends Resource
                 ->language('json')
                 ->nullable()
                 ->hideFromIndex(),
+
+            // show the created_at date in the format "DD/MM/YYYY HH:MM AM/PM"
+            DateTime::make('Generated At', 'created_at')
+                ->sortable(),
         ];
     }
 }

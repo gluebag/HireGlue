@@ -7,6 +7,7 @@ use App\Nova\Actions\ImportJobPostFromContent;
 use App\Nova\Repeaters\EducationItem;
 use App\Nova\Repeaters\ExperienceItem;
 use App\Nova\Repeaters\SkillItem;
+use Laravel\Nova\Fields\DateTime;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\Repeater;
@@ -63,6 +64,7 @@ class JobPost extends Resource
             ID::make()->sortable(),
 
             BelongsTo::make('User')
+                ->hideFromIndex()
                 ->default($request->user()->id)
                 ->withoutTrashed()
                 ->searchable(),
@@ -80,29 +82,29 @@ class JobPost extends Resource
                     if (!$this->salary_range_min && !$this->salary_range_max) {
                         return 'Not specified';
                     }
-                    
+
                     if ($this->salary_range_min && !$this->salary_range_max) {
                         return '$' . number_format($this->salary_range_min);
                     }
-                    
+
                     if (!$this->salary_range_min && $this->salary_range_max) {
                         return 'Up to $' . number_format($this->salary_range_max);
                     }
-                    
+
                     return '$' . number_format($this->salary_range_min) . ' - $' . number_format($this->salary_range_max);
                 }),
                 Text::make('', function() {
                     if (!$this->salary_range_min && !$this->salary_range_max) {
                         return '';
                     }
-                    
-                    $avgSalary = $this->salary_range_min && $this->salary_range_max 
+
+                    $avgSalary = $this->salary_range_min && $this->salary_range_max
                         ? ($this->salary_range_min + $this->salary_range_max) / 2
                         : ($this->salary_range_min ?: $this->salary_range_max);
-                    
+
 //                     $calculatedSalary = $avgSalary;
                     $calculatedSalary = $this->salary_range_min;
-                    
+
                     // Apply fixed threshold based classification
                     if ($calculatedSalary < 175000) {
                         return '<span style="color: #ef4444; font-weight: bold;">Low</span>';
@@ -118,27 +120,27 @@ class JobPost extends Resource
 
             Badge::make('Interest Metrics', function() {
                 $metrics = [];
-                
+
                 if (!empty($this->things_i_like)) {
                     $likesCount = substr_count($this->things_i_like, "\n") + 1;
                     $metrics[] = "Likes: $likesCount";
                 }
-                
+
                 if (!empty($this->things_i_dislike)) {
                     $dislikesCount = substr_count($this->things_i_dislike, "\n") + 1;
                     $metrics[] = "Dislikes: $dislikesCount";
                 }
-                
+
                 if (!empty($this->things_i_like_about_company)) {
                     $companyLikesCount = substr_count($this->things_i_like_about_company, "\n") + 1;
                     $metrics[] = "Co+: $companyLikesCount";
                 }
-                
+
                 if (!empty($this->things_i_dislike_about_company)) {
                     $companyDislikesCount = substr_count($this->things_i_dislike_about_company, "\n") + 1;
                     $metrics[] = "Co-: $companyDislikesCount";
                 }
-                
+
                 return empty($metrics) ? 'No data' : implode(' | ', $metrics);
             })->map([
                 'No data' => 'danger',
@@ -150,13 +152,13 @@ class JobPost extends Resource
                 $prefSkills = $this->preferred_skills ?? [];
                 $reqExp = $this->required_experience ?? [];
                 $reqEdu = $this->required_education ?? [];
-                
+
                 $counts = [];
                 if (count($reqSkills)) $counts[] = count($reqSkills) . " Skills";
                 if (count($prefSkills)) $counts[] = count($prefSkills) . " Pref";
                 if (count($reqExp)) $counts[] = count($reqExp) . " Exp";
                 if (count($reqEdu)) $counts[] = count($reqEdu) . " Edu";
-                
+
                 return empty($counts) ? 'No reqs' : implode(' | ', $counts);
             }),
 
@@ -310,6 +312,10 @@ class JobPost extends Resource
                 ->nullable()
                 ->hideFromIndex(),
 
+            // show the created_at date in the format "DD/MM/YYYY HH:MM AM/PM"
+            DateTime::make('Added At', 'created_at')
+                ->sortable(),
+
             HasMany::make('Resumes'),
             HasMany::make('Cover Letters', 'coverLetters'),
         ];
@@ -326,7 +332,7 @@ class JobPost extends Resource
         return [
             ConvertGoogleJobPost::make()->standalone(),
             ImportJobPostFromContent::make()->standalone(),
-            
+
             new \App\Nova\Actions\GenerateResume,
             new \App\Nova\Actions\GenerateCoverLetter,
             new \App\Nova\Actions\GenerateApplicationMaterials,

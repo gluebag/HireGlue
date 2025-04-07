@@ -36,6 +36,27 @@ class ThreadSession extends Resource
         'id', 'thread_id', 'assistant_id',
     ];
 
+   /**
+     * Get the displayable label of the resource.
+     *
+     * @return string
+     */
+    public static function label()
+    {
+        return 'Threads';
+    }
+
+    /**
+     * Get the displayable singular label of the resource.
+     *
+     * @return string
+     */
+    public static function singularLabel()
+    {
+        return 'AI Thread';
+    }
+
+
     /**
      * Get the fields displayed by the resource.
      *
@@ -46,18 +67,22 @@ class ThreadSession extends Resource
     {
         return [
             ID::make()->sortable(),
-            
-            BelongsTo::make('User'),
-            
+
+            BelongsTo::make('User')
+                ->hideFromIndex()
+                ->default($request->user()->id)
+                ->withoutTrashed()
+                ->searchable(),
+
             BelongsTo::make('Job Post', 'jobPost', JobPost::class),
-            
+
             Badge::make('Type')
                 ->map([
                     'resume' => 'info',
                     'cover_letter' => 'success',
                     'validation' => 'warning',
                 ]),
-                
+
             Badge::make('Status')
                 ->map([
                     'created' => 'info',
@@ -65,25 +90,25 @@ class ThreadSession extends Resource
                     'completed' => 'success',
                     'failed' => 'danger',
                 ]),
-                
+
             Text::make('Assistant ID', 'assistant_id')
                 ->hideFromIndex(),
-                
+
             Text::make('Thread ID', 'thread_id')
                 ->hideFromIndex(),
-                
+
             DateTime::make('Completed At')
                 ->hideFromIndex(),
-                
+
             Textarea::make('Error')
                 ->hideFromIndex()
                 ->onlyOnDetail(),
-                
+
             Code::make('Content')
                 ->language('markdown')
                 ->hideFromIndex()
                 ->onlyOnDetail(),
-                
+
             Code::make('Metrics')
                 ->language('json')
                 ->hideFromIndex()

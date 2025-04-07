@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use Laravel\Nova\Fields\DateTime;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Textarea;
@@ -50,17 +51,14 @@ class WorkExperience extends Resource
             ID::make()->sortable(),
 
             BelongsTo::make('User')
+                ->hideFromIndex()
                 ->default($request->user()->id)
                 ->withoutTrashed()
                 ->searchable(),
 
-            Text::make('Company Name')
-                ->sortable()
-                ->rules('required', 'max:255'),
+            // add time period interval worked field (e.g. "3 months", "2 years", "1 year 3 months")
 
-            Text::make('Position')
-                ->sortable()
-                ->rules('required', 'max:255'),
+
 
             Date::make('Start Date')
                 ->rules('required'),
@@ -70,12 +68,21 @@ class WorkExperience extends Resource
                 ->hideFromIndex()
                 ->help('Leave blank if this is your current job'),
 
+            Text::make('Company Name')
+                ->sortable()
+                ->rules('required', 'max:255'),
+
             Boolean::make('Current Job')
                 ->default(false),
 
+            Text::make('Position')
+                ->sortable()
+                ->rules('required', 'max:255'),
+
             Textarea::make('Description')
                 ->rules('required')
-                ->hideFromIndex(),
+                ->alwaysShow(),
+//                ->hideFromIndex(),
 
             KeyValue::make('Skills Used')
                 ->keyLabel('Skill')
@@ -88,6 +95,10 @@ class WorkExperience extends Resource
                 ->valueLabel('Description')
                 ->nullable()
                 ->hideFromIndex(),
+
+            // show the created_at date in the format "DD/MM/YYYY HH:MM AM/PM"
+            DateTime::make('Added At', 'created_at')
+                ->sortable(),
         ];
     }
 

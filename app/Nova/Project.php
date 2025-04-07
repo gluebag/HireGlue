@@ -2,6 +2,7 @@
 
 namespace App\Nova;
 
+use Laravel\Nova\Fields\DateTime;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Textarea;
@@ -49,10 +50,11 @@ class Project extends Resource
             ID::make()->sortable(),
 
             BelongsTo::make('User')
+                ->hideFromIndex()
                 ->default($request->user()->id)
                 ->withoutTrashed()
                 ->searchable(),
-                
+
             Text::make('Name')
                 ->sortable()
                 ->rules('required', 'max:255'),
@@ -82,6 +84,10 @@ class Project extends Resource
                 ->valueLabel('Description')
                 ->nullable()
                 ->hideFromIndex(),
+
+            // show the created_at date in the format "DD/MM/YYYY HH:MM AM/PM"
+            DateTime::make('Added At', 'created_at')
+                ->sortable(),
         ];
     }
 
