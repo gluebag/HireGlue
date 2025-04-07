@@ -220,9 +220,10 @@ EOT;
      * Format the user profile for messages
      *
      * @param User $user
+     * @param bool $allSkillDetails Whether to include all skill details or just the ones with score >= 9
      * @return string
      */
-    public function formatUserProfile(User $user): string
+    public function formatUserProfile(User $user, bool $allSkillDetails = true): string
     {
         $profile = "### Personal Information:\n";
         $profile .= "Name: {$user->first_name} {$user->last_name}\n";
@@ -311,7 +312,7 @@ EOT;
                 $profile .= "    - {$skill->name}: {$proficiencyText} ({$proficiency})\n";
             }
 
-            if ($proficiency >= 10 && !empty($skill->proficiency_reason)) {
+            if (!empty($skill->proficiency_reason) && ($proficiency >= 10 || $allSkillDetails)) {
                 $profile .= "      - **Details:** {$skill->proficiency_reason}\n";
             }
 
@@ -335,6 +336,13 @@ EOT;
             if (!empty($project->technologies_used)) {
                 $techs = implode(", ", array_keys($project->technologies_used));
                 $profile .= "  **Technologies:** {$techs}\n";
+            }
+
+            if(!empty($project->achievements)) {
+                $profile .= "  **Achievements:**\n";
+                foreach ($project->achievements as $achievement) {
+                    $profile .= "    - {$achievement}\n";
+                }
             }
 
             if (!empty($project->url)) {

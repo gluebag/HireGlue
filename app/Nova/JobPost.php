@@ -7,6 +7,7 @@ use App\Nova\Actions\ImportJobPostFromContent;
 use App\Nova\Repeaters\EducationItem;
 use App\Nova\Repeaters\ExperienceItem;
 use App\Nova\Repeaters\SkillItem;
+use Illuminate\Support\Facades\Log;
 use Laravel\Nova\Fields\DateTime;
 use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\KeyValue;
@@ -22,6 +23,7 @@ use Laravel\Nova\Fields\Boolean;
 use Laravel\Nova\Fields\Currency;
 use Laravel\Nova\Fields\Badge;
 use Laravel\Nova\Fields\Stack;
+use Laravel\Nova\Fields\URL;
 use Laravel\Nova\Panel;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
@@ -75,7 +77,15 @@ class JobPost extends Resource
 
             Text::make('Job Title')
                 ->sortable()
-                ->rules('required', 'max:255'),
+                ->rules('required', 'max:255')
+                ->onlyOnForms(),
+
+            URL::make('Job Title', 'job_post_url')
+                ->displayUsing(function($value, $resource, $attribute) {
+                    return $resource->job_title;
+                })
+                ->sortable()
+                ->exceptOnForms(),
 
             Stack::make('Salary', [
                 Text::make('Salary Range', function() {
