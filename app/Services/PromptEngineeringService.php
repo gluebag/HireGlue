@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\Education;
 use App\Models\JobPost;
 use App\Models\User;
+use App\Models\WorkExperience;
+use Illuminate\Support\Str;
 use OpenAI\Laravel\Facades\OpenAI;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -127,12 +130,13 @@ class PromptEngineeringService
                 'name' => $skill->name,
                 'type' => $skill->type,
                 'proficiency' => $skill->proficiency,
+                'proficiency_reason' => $skill->proficiency_reason,
                 'years' => $skill->years_experience,
             ];
         })->toArray();
 
         // Get user experience
-        $userExperience = $user->workExperiences()->get()->map(function ($exp) {
+        $userExperience = $user->workExperiences()->get()->map(function (WorkExperience $exp) {
             return [
                 'position' => $exp->position,
                 'company' => $exp->company_name,
@@ -141,19 +145,63 @@ class PromptEngineeringService
                     $exp->end_date->diffInYears($exp->start_date),
                 'description' => $exp->description,
                 'achievements' => $exp->achievements,
+                'high_level_key_skills' => collect($exp->skills_used)->mapToGroups(function ($skillName, $skillTypeKey) {
+                    // $skillTypeKey is the type of skill in format of "Hard-1" "Hard-2" "Soft-1" "Soft-2" etc.
+                    // convert it into grouped format of "Hard" => ["skill1", "skill2"]
+                    $skillTypeKey = Str::title(explode('-', $skillTypeKey)[0]);
+                    $skillName = $skillName->name;
+
+                    return [$skillTypeKey => $skillName];
+                })->toArray(),
             ];
         })->toArray();
 
         // Get user education
-        $userEducation = $user->education()->get()->map(function ($edu) {
+        $userEducation = $user->education()->get()->map(function (Education $edu) {
             return [
                 'degree' => $edu->degree,
                 'field' => $edu->field_of_study,
                 'institution' => $edu->institution,
+                'achievements' => $edu->achievements_breakdown,
             ];
         })->toArray();
 
+        $prompt = "Match the following candidate profile to the job requirements and provide an analysis of strengths and gaps:
+
+# Job Requirements
+" . json_encode($requirements, JSON_PRETTY_PRINT) . "
+
+# Candidate Profile
+## Skills
+" . json_encode($userSkills, JSON_PRETTY_PRINT) . "
+
+## Experience
+" . json_encode($userExperience, JSON_PRETTY_PRINT) . "
+
+## Education
+" . json_encode($userEducation, JSON_PRETTY_PRINT) . "
+
+Return your analysis as a JSON object with these categories:
+1. matched_skills - skills that match requirements (with match score 1-10)
+2. skill_gaps - skills the candidate lacks or needs to improve
+3. experience_matches - experience that aligns with requirements
+4. experience_gaps - missing or insufficient experience
+5. education_matches - education that meets requirements
+6. education_gaps - missing or insufficient education
+7. overall_match_score - overall match percentage (0-100)
+8. emphasis_suggestions - areas to emphasize in resume/cover letter";
+
+        $promptResponse = null;
+        $matchAnalysis = null;
+
         try {
+
+            Log::debug("Matching skills to requirements", [
+                'user_id' => $user->id,
+                'job_requirements' => $requirements,
+                'prompt' => $prompt,
+            ]);
+
             $response = OpenAI::chat()->create([
                 'model' => 'gpt-4o',
                 'temperature' => 0.3,
@@ -164,42 +212,27 @@ class PromptEngineeringService
                     ],
                     [
                         'role' => 'user',
-                        'content' => "Match the following candidate profile to the job requirements and provide an analysis of strengths and gaps:
-
-                        # Job Requirements
-                        " . json_encode($requirements, JSON_PRETTY_PRINT) . "
-
-                        # Candidate Profile
-                        ## Skills
-                        " . json_encode($userSkills, JSON_PRETTY_PRINT) . "
-
-                        ## Experience
-                        " . json_encode($userExperience, JSON_PRETTY_PRINT) . "
-
-                        ## Education
-                        " . json_encode($userEducation, JSON_PRETTY_PRINT) . "
-
-                        Return your analysis as a JSON object with these categories:
-                        1. matched_skills - skills that match requirements (with match score 1-10)
-                        2. skill_gaps - skills the candidate lacks or needs to improve
-                        3. experience_matches - experience that aligns with requirements
-                        4. experience_gaps - missing or insufficient experience
-                        5. education_matches - education that meets requirements
-                        6. education_gaps - missing or insufficient education
-                        7. overall_match_score - overall match percentage (0-100)
-                        8. emphasis_suggestions - areas to emphasize in resume/cover letter"
+                        'content' => $prompt
                     ]
                 ]
             ]);
 
-            $content = $response->choices[0]->message->content;
+
+            $promptResponse = $response->choices[0]->message->content;
+
+            Log::debug("Match analysis response", [
+                'user_id' => $user->id,
+                'job_requirements' => $requirements,
+                'prompt' => $prompt,
+                'response' => $promptResponse,
+            ]);
 
             // Parse JSON response
-            $matchAnalysis = json_decode($content, true);
+            $matchAnalysis = json_decode($promptResponse, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
                 // If the response isn't valid JSON, try to extract it
-                preg_match('/```json(.*?)```/s', $content, $matches);
+                preg_match('/```json(.*?)```/s', $promptResponse, $matches);
                 if (isset($matches[1])) {
                     $matchAnalysis = json_decode(trim($matches[1]), true);
                     if (json_last_error() !== JSON_ERROR_NONE) {
@@ -216,19 +249,30 @@ class PromptEngineeringService
             Log::error("Failed to match skills to requirements", [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
+                'profile' => [
+                    'skills' => $userSkills,
+                    'experience' => $userExperience,
+                    'education' => $userEducation,
+                ],
+                'job_requirements' => $requirements,
+                'prompt' => $prompt,
+                'prompt_response' => $promptResponse,
+                'match_analysis' => $matchAnalysis,
             ]);
 
-            // Return a basic structure if matching fails
-            return [
-                'matched_skills' => [],
-                'skill_gaps' => [],
-                'experience_matches' => [],
-                'experience_gaps' => [],
-                'education_matches' => [],
-                'education_gaps' => [],
-                'overall_match_score' => 50,
-                'emphasis_suggestions' => [],
-            ];
+            throw $e;
+//
+//            // Return a basic structure if matching fails
+//            return [
+//                'matched_skills' => [],
+//                'skill_gaps' => [],
+//                'experience_matches' => [],
+//                'experience_gaps' => [],
+//                'education_matches' => [],
+//                'education_gaps' => [],
+//                'overall_match_score' => 50,
+//                'emphasis_suggestions' => [],
+//            ];
         }
     }
 
