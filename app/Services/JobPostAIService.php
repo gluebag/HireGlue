@@ -45,13 +45,13 @@ class JobPostAIService
     public function analyzeJobPost(string $content): array
     {
         // Find the Job Post Analysis prompt
-        $prompt = OpenAIPrompt::where('name', 'Job Post Analysis')
+        $prompt = OpenAIPrompt::where('name', 'job_post_analysis_20250409')
             ->where('type', 'analysis')
             ->where('active', true)
             ->first();
 
         if (!$prompt) {
-            throw new Exception('Job Post Analysis prompt not found. Please run the OpenAIPromptSeeder.');
+            throw new Exception('job_post_analysis_20250409 prompt not found. Please run the OpenAIPromptSeeder.');
         }
 
         // Generate completion and parse result
@@ -85,21 +85,29 @@ class JobPostAIService
         // Replace placeholders in the prompt template
         $promptText = $this->replacePlaceholders($prompt->prompt_template, $parameters);
 
+        if(empty($systemMessage = $prompt->system_message)) {
+            throw new Exception('System message is empty. Please check the prompt configuration.');
+            // $systemMessage = 'You are a career coach assistant with over 20 years of experience helping job seekers land roles in the tech industry.';
+        }
+
         // Prepare the request payload
         $payload = [
             'model' => $prompt->model,
             'messages' => [
-                ['role' => 'system', 'content' => 'You are a helpful assistant.'],
+                ['role' => 'system', 'content' => $systemMessage],
                 ['role' => 'user', 'content' => $promptText],
             ],
             'temperature' => (float) $prompt->temperature,
-            'max_tokens' => (int) $prompt->max_tokens,
+
+            // No max_tokens parameter - let the model determine the appropriate length
+            // 'max_tokens' => (int) $prompt->max_tokens,
         ];
 
         // Log the request (omit the API key for security)
         Log::info('OpenAI Request', [
             'model' => $prompt->model,
-            'max_tokens' => $prompt->max_tokens,
+            // No max_tokens parameter - let the model determine the appropriate length
+            // 'max_tokens' => $prompt->max_tokens,
             'temperature' => $prompt->temperature,
         ]);
 

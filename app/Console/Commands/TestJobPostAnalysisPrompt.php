@@ -29,12 +29,12 @@ class TestJobPostAnalysisPrompt extends Command
     public function handle()
     {
         $this->info('Creating or updating Job Post Analysis prompt...');
-        
+
         // Create or update the prompt
         $prompt = $this->createOrUpdatePrompt();
-        
+
         $this->info('Job Post Analysis prompt created successfully!');
-        
+
         // Test the prompt if a file path is provided
         $filePath = $this->argument('file');
         if ($filePath) {
@@ -43,10 +43,10 @@ class TestJobPostAnalysisPrompt extends Command
             $this->info('No test file provided. To test the prompt, run:');
             $this->line('  php artisan test:job-post-analysis-prompt path/to/job-post.md');
         }
-        
+
         return 0;
     }
-    
+
     /**
      * Create or update the Job Post Analysis prompt
      *
@@ -61,7 +61,8 @@ class TestJobPostAnalysisPrompt extends Command
             ],
             [
                 'model' => 'gpt-4o',
-                'max_tokens' => 2500,
+                // No max_tokens parameter - let the model determine the appropriate length
+                // 'max_tokens' => 2500,
                 'temperature' => 0.2,
                 'active' => true,
                 'prompt_template' => $this->getPromptTemplate(),
@@ -73,10 +74,10 @@ class TestJobPostAnalysisPrompt extends Command
                 ])
             ]
         );
-        
+
         return $prompt;
     }
-    
+
     /**
      * Test the prompt with a sample job post
      *
@@ -87,66 +88,66 @@ class TestJobPostAnalysisPrompt extends Command
     protected function testPrompt(OpenAIPrompt $prompt, string $filePath)
     {
         $this->info('Testing Job Post Analysis prompt with file: ' . $filePath);
-        
+
         if (!File::exists($filePath)) {
             $this->error('File not found: ' . $filePath);
             return;
         }
-        
+
         try {
             // Read job post content
             $content = File::get($filePath);
             $this->info('Job post content loaded (' . strlen($content) . ' characters)');
-            
+
             // Call OpenAI service
             $openai = app(OpenAIService::class);
             $this->info('Analyzing job post with OpenAI...');
-            
+
             $result = $openai->generateCompletion($prompt, [
                 'job_content' => $content
             ]);
-            
+
             // Parse the result
             $parsedResult = json_decode($result, true);
-            
+
             if (json_last_error() !== JSON_ERROR_NONE) {
                 $this->error('Error parsing JSON response: ' . json_last_error_msg());
                 $this->line('Raw response:');
                 $this->line($result);
                 return;
             }
-            
+
             $this->info('Job Post Analysis completed successfully!');
             $this->line('');
-            
+
             // Display result summary
             $this->info('Job Title: ' . ($parsedResult['job_title'] ?? 'Not found'));
             $this->info('Company Name: ' . ($parsedResult['company_name'] ?? 'Not found'));
             $this->info('Job Location Type: ' . ($parsedResult['job_location_type'] ?? 'Not found'));
             $this->info('Position Level: ' . ($parsedResult['position_level'] ?? 'Not found'));
             $this->info('Job Type: ' . ($parsedResult['job_type'] ?? 'Not found'));
-            
+
             $this->info('Required Skills: ' . count($parsedResult['required_skills'] ?? []));
             $this->info('Preferred Skills: ' . count($parsedResult['preferred_skills'] ?? []));
             $this->info('Required Experience: ' . count($parsedResult['required_experience'] ?? []));
             $this->info('Required Education: ' . count($parsedResult['required_education'] ?? []));
-            
+
             if (isset($parsedResult['salary_range_min']) && isset($parsedResult['salary_range_max'])) {
                 $this->info('Salary Range: $' . number_format($parsedResult['salary_range_min']) . ' - $' . number_format($parsedResult['salary_range_max']));
             }
-            
+
             // Option to save full JSON
             if ($this->confirm('Do you want to save the full JSON output to a file?', false)) {
                 $outputPath = 'job_post_analysis_' . date('Y-m-d_His') . '.json';
                 File::put($outputPath, json_encode($parsedResult, JSON_PRETTY_PRINT));
                 $this->info('Full JSON saved to: ' . $outputPath);
             }
-            
+
         } catch (\Exception $e) {
             $this->error('Error testing prompt: ' . $e->getMessage());
         }
     }
-    
+
     /**
      * Get the prompt template
      *
@@ -155,7 +156,7 @@ class TestJobPostAnalysisPrompt extends Command
     protected function getPromptTemplate()
     {
         return <<<EOT
-You are an expert job application assistant that helps parse and structure job postings. 
+You are an expert job application assistant that helps parse and structure job postings.
 Analyze the following job posting and extract the required information in the exact JSON structure provided below.
 
 Job Posting:

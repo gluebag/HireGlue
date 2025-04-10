@@ -67,6 +67,7 @@ class Skill extends Resource
                     'other' => 'Other'
                 ])
                 ->default('technical')
+                ->sortable()
                 ->rules('required'),
 
             Number::make('Proficiency')
@@ -81,6 +82,7 @@ class Skill extends Resource
                 ->help('Explain why you rated your proficiency this way'),
 
             Number::make('Years Experience')
+                ->sortable()
                 ->min(0)
                 ->default(0),
 

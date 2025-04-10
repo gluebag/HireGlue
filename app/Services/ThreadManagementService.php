@@ -227,8 +227,8 @@ EOT;
     {
         $profile = "### Personal Information:\n";
         $profile .= "Name: {$user->first_name} {$user->last_name}\n";
-        $profile .= "Email: {$user->email}\n";
-        $profile .= "Phone: {$user->phone_number}\n";
+        $profile .= "Email me: {$user->email}\n";
+        $profile .= "Call me: {$user->phone_number}\n";
         $profile .= "Location: {$user->location}\n";
 
         if ($user->linkedin_url) {
@@ -244,7 +244,9 @@ EOT;
         }
 
         // Add work experience
-        $profile .= "\n### Work Experience:\n";
+        // switched to "Professional Experience" as per jeff su videos
+        // $profile .= "\n### Work Experience:\n";
+        $profile .= "\n### Professional/Work Experience:\n";
         foreach ($user->workExperiences()->orderBy('start_date', 'desc')->get() as $experience) {
             $endDate = $experience->current_job ? "Present" : $experience->end_date->format('M Y');
             $profile .= "- **{$experience->position}** at {$experience->company_name} ({$experience->start_date->format('M Y')} - {$endDate})\n";

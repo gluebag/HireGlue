@@ -58,7 +58,7 @@ class ImportUserData extends Action
                 ])
                 ->rules('required')
                 ->default('any'),
-            
+
             BooleanGroup::make('Import Categories', 'import_categories')
                 ->options([
                     'skills' => 'Skills',
@@ -84,11 +84,11 @@ class ImportUserData extends Action
         try {
             $fileContent = null;
             $selectedCategories = array_keys(array_filter($fields->import_categories ?? []));
-            
+
             if (empty($selectedCategories)) {
                 return Action::danger('Please select at least one category to import.');
             }
-            
+
             if (!empty($fields->resume_file)) {
                 /** @var UploadedFile $uploadedFile */
                 $uploadedFile = $fields->resume_file;
@@ -147,13 +147,13 @@ class ImportUserData extends Action
             } elseif (!empty($fields->pasted_content)) {
                 $fileType = $fields->file_type;
                 $content = $fields->pasted_content;
-                
+
                 \Log::debug('Importing potential skills, experience, and education from pasted content', [
                     'user_id' => Auth::id(),
                     'file_type' => $fileType,
                     'content_length' => strlen($content),
                 ]);
-                
+
                 // Check if content is HTML
                 if ($fileType === 'html' || $fileType === 'any' && $this->looksLikeHtml($content)) {
                     \Log::debug('Converting HTML content to markdown', [
@@ -184,24 +184,24 @@ class ImportUserData extends Action
             // Build detailed message
             $message = 'Successfully imported user data from resume!<br><br>';
             $message .= "<strong>Summary:</strong><br>";
-            
+
             if (in_array('skills', $selectedCategories)) {
-                $message .= "• Skills: {$stats['skills']['added']} added" . 
+                $message .= "• Skills: {$stats['skills']['added']} added" .
                            ($stats['skills']['skipped'] > 0 ? ", {$stats['skills']['skipped']} duplicates skipped" : "") . "<br>";
             }
-            
+
             if (in_array('education', $selectedCategories)) {
-                $message .= "• Education: {$stats['education']['added']} added" . 
+                $message .= "• Education: {$stats['education']['added']} added" .
                            ($stats['education']['skipped'] > 0 ? ", {$stats['education']['skipped']} duplicates skipped" : "") . "<br>";
             }
-            
+
             if (in_array('work_experience', $selectedCategories)) {
-                $message .= "• Work Experience: {$stats['work_experience']['added']} added" . 
+                $message .= "• Work Experience: {$stats['work_experience']['added']} added" .
                            ($stats['work_experience']['skipped'] > 0 ? ", {$stats['work_experience']['skipped']} duplicates skipped" : "") . "<br>";
             }
-            
+
             if (in_array('projects', $selectedCategories)) {
-                $message .= "• Projects: {$stats['projects']['added']} added" . 
+                $message .= "• Projects: {$stats['projects']['added']} added" .
                            ($stats['projects']['skipped'] > 0 ? ", {$stats['projects']['skipped']} duplicates skipped" : "");
             }
 
@@ -222,10 +222,10 @@ class ImportUserData extends Action
      */
     private function looksLikeHtml(string $content): bool
     {
-        return 
-            stripos($content, '<html') !== false || 
+        return
+            stripos($content, '<html') !== false ||
             stripos($content, '<!doctype') !== false ||
-            (stripos($content, '<') !== false && 
+            (stripos($content, '<') !== false &&
              preg_match('/<(\w+)(?:\s+[\w\-]+=(?:"[^"]*"|\'[^\']*\'))*\s*>/i', $content));
     }
 
@@ -282,26 +282,26 @@ class ImportUserData extends Action
     {
         // Build prompt based on selected categories
         $prompt = "Extract the following information from this resume in a structured JSON format:";
-        
+
         if (empty($categories) || in_array('skills', $categories)) {
             $prompt .= "\n1. Skills (with name, type as technical/soft/language/other, estimated proficiency 1-10, years of experience if mentioned)";
         }
-        
+
         if (empty($categories) || in_array('education', $categories)) {
             $prompt .= "\n2. Education (with institution, degree, field_of_study, start_date, end_date, achievements)";
         }
-        
+
         if (empty($categories) || in_array('work_experience', $categories)) {
             $prompt .= "\n3. Work Experience (with company_name, position, start_date, end_date, description, skills_used, achievements)";
         }
-        
+
         if (empty($categories) || in_array('projects', $categories)) {
             $prompt .= "\n4. Projects (with name, description, technologies_used, url if available)";
         }
-        
+
         $prompt .= "\n\n- Make sure all 'start_date' and 'end_date' fields are in ISO 8601 format (YYYY-MM-DD) or null if determined to be present (still working there etc).
         - Ignore or reword/rename skills that are not popular or industry standard. Apply common sense rewording knowing that the parsed result will be used on a new resume to apply at Google (Very complicated to get into Google so make sure to use the best skills and experience possible).
-        - Make sure to use the most common and popular skills and experience that are relevant to the job market.
+        - Make sure to use the most common and popular skill names and experience that are relevant to the job market.
         - For education, allow high school education to be included, and include clever rewording to make it sound more impressive.
         - For projects, include any personal projects or open source contributions and that may not be explicitly listed in the resume.
 
@@ -311,8 +311,9 @@ class ImportUserData extends Action
 
         $response = OpenAI::chat()->create([
             'model' => 'gpt-4o',
-            'max_tokens' => 3000,
-            'temperature' => 0.1,
+            // No max_tokens parameter - let the model determine the appropriate length
+            // 'max_tokens' => 3000,
+            'temperature' => 0.7,
             'messages' => [
                 [
                     'role' => 'system',
@@ -335,7 +336,7 @@ class ImportUserData extends Action
 
     /**
      * Save parsed user data to database
-     * 
+     *
      * @param array $parsedData
      * @param array $selectedCategories
      * @return array Statistics about added and skipped items

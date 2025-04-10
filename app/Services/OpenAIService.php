@@ -83,7 +83,7 @@ class OpenAIService
         }
 
         // Call OpenAI API
-        $result = $this->callOpenAI($prompt->model, $finalPrompt, $prompt->max_tokens, $prompt->temperature);
+        $result = $this->callOpenAI($prompt->model, $finalPrompt, $prompt->max_tokens, $prompt->temperature, $prompt->system_message);
 
         // Return generated content
         return [
@@ -140,7 +140,7 @@ class OpenAIService
         }
 
         // Call OpenAI API
-        $result = $this->callOpenAI($prompt->model, $finalPrompt, $prompt->max_tokens, $prompt->temperature);
+        $result = $this->callOpenAI($prompt->model, $finalPrompt, $prompt->max_tokens, $prompt->temperature, $prompt->system_message);
 
         // Return generated content
         return [
@@ -181,7 +181,7 @@ class OpenAIService
         ]);
 
         // Call OpenAI API with lower temperature for more deterministic response
-        $result = $this->callOpenAI($prompt->model, $finalPrompt, $prompt->max_tokens, 0.3);
+        $result = $this->callOpenAI($prompt->model, $finalPrompt, $prompt->max_tokens, 0.3, $prompt->system_message);
 
         // Parse the response to extract rule compliance results
         return [
@@ -430,21 +430,25 @@ class OpenAIService
      * @param float $temperature
      * @return mixed
      */
-    protected function callOpenAI(string $model, string $prompt, int $maxTokens, float $temperature)
+    protected function callOpenAI(string $model, string $prompt, int $maxTokens, float $temperature, string $systemMessage = null)
     {
+        if(empty($systemMessage)) {
+            $systemMessage = 'You are an expert resume and cover letter writer with over 20 years of experience who creates perfectly tailored documents for specific job postings in the tech industry.';
+        }
         return OpenAI::chat()->create([
             'model' => $model,
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => 'You are an expert resume and cover letter writer who creates perfectly tailored documents for specific job postings.'
+                    'content' => $systemMessage
                 ],
                 [
                     'role' => 'user',
                     'content' => $prompt
                 ]
             ],
-            'max_tokens' => $maxTokens,
+            // No max_tokens parameter - let the model determine the appropriate length
+            // 'max_tokens' => $maxTokens,
             'temperature' => $temperature,
         ]);
     }
@@ -467,17 +471,20 @@ class OpenAIService
         $payload = [
             'model' => $prompt->model,
             'messages' => [
+                // TODO change to prompt having the system message
                 ['role' => 'system', 'content' => 'You are a helpful assistant.'],
                 ['role' => 'user', 'content' => $promptText],
             ],
             'temperature' => (float) $prompt->temperature,
-            'max_tokens' => (int) $prompt->max_tokens,
+            // No max_tokens parameter - let the model determine the appropriate length
+            // 'max_tokens' => (int) $prompt->max_tokens,
         ];
 
         // Log the request (omit the API key for security)
         Log::info('OpenAI Request', [
             'model' => $prompt->model,
-            'max_tokens' => $prompt->max_tokens,
+            // No max_tokens parameter - let the model determine the appropriate length
+            // 'max_tokens' => $prompt->max_tokens,
             'temperature' => $prompt->temperature,
         ]);
 
