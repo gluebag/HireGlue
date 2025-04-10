@@ -11,15 +11,19 @@ class OpenAIPrompt extends Model
 
     protected $table = 'openai_prompts';
 
-    protected $fillable = [
-        'name', 'type', 'prompt_template', 'parameters',
-        'model', 'max_tokens', 'temperature', 'active'
-    ];
+    protected $guarded = [];
 
     protected $casts = [
         'parameters' => 'array',
         'max_tokens' => 'integer',
         'temperature' => 'decimal:1',
-        'active' => 'boolean'
+        'active' => 'boolean',
     ];
+
+    public function promptHistory() :\Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PromptHistory::class, 'prompt_id');
+    }
+
+//    public function last
 }

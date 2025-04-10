@@ -63,7 +63,7 @@ class OpenAIPrompt extends Resource
     /**
      * Get the fields displayed by the resource.
      *
-     * @param  \Laravel\Nova\Http\Requests\NovaRequest  $request
+     * @param \Laravel\Nova\Http\Requests\NovaRequest $request
      * @return array
      */
     public function fields(NovaRequest $request)
@@ -75,10 +75,8 @@ class OpenAIPrompt extends Resource
                 ->sortable()
                 ->rules('required', 'max:255'),
 
-
-
             Boolean::make('Active')
-            ->default(true),
+                ->default(true),
 
             // Form field
             Select::make('Type')
@@ -114,9 +112,17 @@ class OpenAIPrompt extends Resource
                 ])
                 ->exceptOnForms(),
 
+            Textarea::make('System Message')
+                ->alwaysShow()
+                ->nullable(),
+
             Textarea::make('Prompt Template')
                 ->alwaysShow()
                 ->rules('required'),
+
+            Textarea::make('Example Message')
+                ->alwaysShow()
+                ->nullable(),
 
             Code::make('Parameters')
                 ->language('json')
@@ -207,6 +213,9 @@ class OpenAIPrompt extends Resource
             // Display field
             Badge::make('Max Tokens')
                 ->resolveUsing(function ($value) {
+                    // No max_tokens parameter - let the model determine the appropriate length
+                    return 'extreme';
+
                     // Categorize token usage into ranges
                     if ($value > 32000) return 'extreme';
                     if ($value > 16000) return 'very-high';
@@ -216,11 +225,13 @@ class OpenAIPrompt extends Resource
                 })
                 ->addTypes([
                     'generic' => 'font-medium text-gray-600',
-
                 ])
                 ->label(function ($value) {
+                    // No max_tokens parameter - let the model determine the appropriate length
+                    return 'No limit';
+
                     // Format the label to show the number of tokens
-                    return $value . ' (' . $this->max_tokens . ')';
+                    // return $value . ' (' . $this->max_tokens . ')';
                 })
                 ->map([
                     'extreme' => 'danger',
