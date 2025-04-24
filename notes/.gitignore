@@ -1,0 +1,4 @@
+*
+!.gitignore
+!table-backups/user-profile-backup.txt
+!table-backups/user-skills-backup.json
