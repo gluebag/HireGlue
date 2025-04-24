@@ -49,7 +49,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
 
         Nova::mainMenu(function (Request $request) {
             return [
-                \Laravel\Nova\Menu\MenuItem::dashboard(\App\Nova\Dashboards\Main::class),
+//                \Laravel\Nova\Menu\MenuItem::dashboard(\App\Nova\Dashboards\Main::class),
 
                 \Laravel\Nova\Menu\MenuSection::make('User Profile', [
                     \Laravel\Nova\Menu\MenuItem::resource(User::class),
@@ -127,7 +127,7 @@ class NovaServiceProvider extends NovaApplicationServiceProvider
     protected function dashboards(): array
     {
         return [
-            new \App\Nova\Dashboards\Main,
+//            new \App\Nova\Dashboards\Main,
         ];
     }
 
