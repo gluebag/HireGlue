@@ -9,6 +9,7 @@ use Laravel\Nova\Fields\Textarea;
 use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Date;
 use Laravel\Nova\Fields\KeyValue;
+use Laravel\Nova\Fields\MorphMany;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 class Project extends Resource
@@ -73,11 +74,13 @@ class Project extends Resource
                 ->hideFromIndex()
                 ->nullable(),
 
-            KeyValue::make('Technologies Used')
-                ->keyLabel('Technology')
-                ->valueLabel('Details')
-                ->nullable()
-                ->hideFromIndex(),
+            // KeyValue::make('Technologies Used')
+            //     ->keyLabel('Technology')
+            //     ->valueLabel('Details')
+            //     ->nullable()
+            //     ->hideFromIndex(),
+
+            MorphMany::make('Skills'),
 
             KeyValue::make('Achievements')
                 ->keyLabel('Achievement')

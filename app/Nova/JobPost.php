@@ -5,12 +5,8 @@ namespace App\Nova;
 use App\Nova\Actions\ConvertGoogleJobPost;
 use App\Nova\Actions\ImportJobPostFromContent;
 use App\Nova\Repeaters\EducationItem;
-use App\Nova\Repeaters\ExperienceItem;
-use App\Nova\Repeaters\SkillItem;
-use Illuminate\Support\Facades\Log;
 use Laravel\Nova\Fields\DateTime;
 use Laravel\Nova\Fields\ID;
-use Laravel\Nova\Fields\KeyValue;
 use Laravel\Nova\Fields\Repeater;
 use Laravel\Nova\Fields\Text;
 use Laravel\Nova\Fields\Textarea;
@@ -26,6 +22,7 @@ use Laravel\Nova\Fields\Stack;
 use Laravel\Nova\Fields\URL;
 use Laravel\Nova\Panel;
 use Laravel\Nova\Http\Requests\NovaRequest;
+use Laravel\Nova\Fields\MorphMany;
 
 class JobPost extends Resource
 {
@@ -160,13 +157,13 @@ class JobPost extends Resource
             Text::make('Requirements', function() {
                 $reqSkills = $this->required_skills ?? [];
                 $prefSkills = $this->preferred_skills ?? [];
-                $reqExp = $this->required_experience ?? [];
+                // $reqExp = $this->required_experience ?? [];
                 $reqEdu = $this->required_education ?? [];
 
                 $counts = [];
                 if (count($reqSkills)) $counts[] = count($reqSkills) . " Skills";
                 if (count($prefSkills)) $counts[] = count($prefSkills) . " Pref";
-                if (count($reqExp)) $counts[] = count($reqExp) . " Exp";
+                // if (count($reqExp)) $counts[] = count($reqExp) . " Exp";
                 if (count($reqEdu)) $counts[] = count($reqEdu) . " Edu";
 
                 return empty($counts) ? 'No reqs' : implode(' | ', $counts);
@@ -184,29 +181,49 @@ class JobPost extends Resource
                 ->nullable()
                 ->hideFromIndex(),
 
-            Repeater::make('Required Experience')
-                ->repeatables([
-                    ExperienceItem::make()
-                ])
-                ->asJson()
-                ->nullable()
-                ->hideFromIndex(),
 
-            Repeater::make('Required Skills')
-                ->repeatables([
-                    SkillItem::make()
-                ])
-                ->asJson()
-                ->nullable()
-                ->hideFromIndex(),
+            MorphMany::make('Skills'),
 
-            Repeater::make('Preferred Skills')
-                ->repeatables([
-                    SkillItem::make()
-                ])
-                ->asJson()
-                ->nullable()
-                ->hideFromIndex(),
+            // // todo: (Ideal Skills) -> USE and ADD new polymorphic skillable type mapping representation using SkllItem repeater
+            // // todo: -- **Skills Used:**\n
+            // // todo: add years of experience here
+            // // todo: add type of skill (enum('technical','soft','domain','tool','language','other'))
+            // // todo: add proficiency reason string
+            // // todo: add proficiency reason type enum('job_post_description','project','work','github','local_code','other')
+            // Repeater::make('Ideal Skills')
+            //     ->repeatables([
+            //     ])
+            //     ->uniqueField('name')
+            //     ->asJson()
+            //     ->nullable()
+            //     ->hideFromIndex(),
+
+            // // todo: (Required Skills) -> USE and ADD new polymorphic skillable type mapping representation using SkllItem repeater
+            // // todo: -- **Skills Used:**\n
+            // // todo: add years of experience here
+            // // todo: add type of skill (enum('technical','soft','domain','tool','language','other'))
+            // // todo: add proficiency reason string
+            // // todo: add proficiency reason type enum('job_post_description','project','work','github','local_code','other')
+            // Repeater::make('Required Skills')
+            //     ->repeatables([
+            //     ])
+            //     ->uniqueField('name')
+            //     ->asJson()
+            //     ->nullable()
+            //     ->hideFromIndex(),
+
+            // // todo: (Preferred Skills) -> USE and ADD new polymorphic skillable type mapping representation using SkllItem repeater
+            // // todo: -- **Skills Used:**\n
+            // // todo: add years of experience here
+            // // todo: add type of skill (enum('technical','soft','domain','tool','language','other'))
+            // // todo: add proficiency reason string
+            // // todo: add proficiency reason type enum('job_post_description','project','work','github','local_code','other')
+            // Repeater::make('Preferred Skills')
+            //     ->repeatables([
+            //     ])
+            //     ->asJson()
+            //     ->nullable()
+            //     ->hideFromIndex(),
 
             Text::make('Job Post URL')
                 ->hideFromIndex()
@@ -328,6 +345,7 @@ class JobPost extends Resource
 
             HasMany::make('Resumes'),
             HasMany::make('Cover Letters', 'coverLetters'),
+
         ];
     }
 

@@ -10,6 +10,7 @@ use Laravel\Nova\Fields\BelongsTo;
 use Laravel\Nova\Fields\Date;
 use Laravel\Nova\Fields\Boolean;
 use Laravel\Nova\Fields\KeyValue;
+use Laravel\Nova\Fields\MorphMany;
 use Laravel\Nova\Http\Requests\NovaRequest;
 
 class WorkExperience extends Resource
@@ -84,11 +85,13 @@ class WorkExperience extends Resource
                 ->alwaysShow(),
 //                ->hideFromIndex(),
 
-            KeyValue::make('Skills Used')
-                ->keyLabel('Skill')
-                ->valueLabel('Description')
-                ->nullable()
-                ->hideFromIndex(),
+            // KeyValue::make('Skills Used')
+            //     ->keyLabel('Skill')
+            //     ->valueLabel('Description')
+            //     ->nullable()
+            //     ->hideFromIndex(),
+
+            MorphMany::make('Skills'),
 
             KeyValue::make('Achievements')
                 ->keyLabel('Achievement')

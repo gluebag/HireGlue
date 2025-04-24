@@ -71,7 +71,7 @@ class User extends Authenticatable
 
     public function skills()
     {
-        return $this->hasMany(Skill::class);
+        return $this->morphMany(Skill::class, 'skillable');
     }
 
     public function projects()

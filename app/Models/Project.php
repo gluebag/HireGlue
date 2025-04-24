@@ -12,18 +12,22 @@ class Project extends Model
 
     protected $fillable = [
         'user_id', 'name', 'description', 'start_date', 'end_date',
-        'url', 'technologies_used', 'achievements'
+        'url', 'achievements'
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
-        'technologies_used' => 'array',
         'achievements' => 'array'
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function skills()
+    {
+        return $this->morphMany(Skill::class, 'skillable');
     }
 }
