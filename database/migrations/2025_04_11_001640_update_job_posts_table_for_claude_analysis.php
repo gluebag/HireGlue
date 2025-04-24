@@ -23,8 +23,9 @@ return new class extends Migration
             $table->text('biggest_challenge_description')->nullable()->after('first_time_applying');
             $table->text('biggest_challenge_root_cause')->nullable()->after('biggest_challenge_description');
 
-            // Add ideal skills field
-            $table->json('ideal_skills')->nullable()->after('preferred_skills');
+            // NOt used anymore (Add ideal skills field) -- use new polymorphic relationship on skills table
+            // todo: new way is use polymorphic relationship on skills table
+            // $table->json('ideal_skills')->nullable()->after('preferred_skills');
         });
     }
 
@@ -42,7 +43,6 @@ return new class extends Migration
                 'posted_date',
                 'biggest_challenge_description',
                 'biggest_challenge_root_cause',
-                'ideal_skills'
             ]);
         });
     }

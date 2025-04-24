@@ -18,7 +18,11 @@ return new class extends Migration {
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->string('url')->nullable();
-            $table->json('technologies_used')->nullable();
+
+            // old legacy way,
+            // $table->json('technologies_used')->nullable();
+            // todo: new way is use polymorphic relationship on skills table
+
             $table->json('achievements')->nullable();
             $table->timestamps();
             $table->softDeletes();

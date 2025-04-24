@@ -12,13 +12,31 @@ return new class extends Migration {
     {
         Schema::create('skills', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained();
+
+            $table->morphs('skillable');
+
             $table->string('name');
-            $table->enum('type', ['technical', 'soft', 'language', 'other'])->default('technical');
-            $table->integer('proficiency')->default(0); // 1-10 scale
-            $table->integer('years_experience')->default(0);
+
+            $table->unique(['skillable_id', 'skillable_type', 'name'], 'unique_skill_name');
+
+            $table->enum('type', ['technical', 'soft', 'domain', 'tool', 'work_experience', 'language', 'other'])
+                ->nullable()
+                ->comment('Type of skill. Technical, Soft Skill, Domain Knowledge, Tool/Software, Language, Other');
+
+            $table->integer('years_experience')->nullable()
+                ->comment('Estimated years of experience in this skill');
+
+            $table->integer('proficiency')->nullable()
+                ->comment('Proficiency level from 1 to 10');
+
+            $table->enum('proficiency_reason_type', ['job_post_description', 'project', 'work', 'github', 'local_code', 'other'])
+                ->nullable()
+                ->comment('Type of reason for the proficiency level. Job Post Analysis, Project Experience, Work Experience/Achievements, GitHub/Portfolio Analysis, Local Code Analysis, Other');
+
+            $table->text('proficiency_reason')->nullable()
+                ->comment('Reason for the proficiency level (e.g., projects, reference in job post description, etc.)');
+
             $table->timestamps();
-            $table->softDeletes();
         });
     }
 

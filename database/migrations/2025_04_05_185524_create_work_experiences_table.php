@@ -19,7 +19,12 @@ return new class extends Migration {
             $table->date('end_date')->nullable();
             $table->boolean('current_job')->default(false);
             $table->text('description');
-            $table->json('skills_used')->nullable();
+
+
+            // old legacy way,
+            // todo: new way is use polymorphic relationship on skills table
+            // $table->json('skills_used')->nullable();
+
             $table->json('achievements')->nullable();
             $table->timestamps();
             $table->softDeletes();

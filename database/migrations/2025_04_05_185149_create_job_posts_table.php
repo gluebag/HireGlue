@@ -19,9 +19,14 @@ return new class extends Migration {
             $table->string('job_post_url')->nullable();
             $table->date('job_post_date')->nullable();
             $table->enum('job_location_type', ['remote', 'in-office', 'hybrid'])->default('remote');
-            $table->json('required_skills')->nullable();
-            $table->json('preferred_skills')->nullable();
-            $table->json('required_experience')->nullable();
+
+            // old legacy way, new way is use polymorphic relationship on skills table
+            // $table->json('required_skills')->nullable();
+            // $table->json('preferred_skills')->nullable();
+            // $table->json('ideal_skills')->nullable()->after('preferred_skills');
+            // todo: dont need the following "required_experience" anymore, combine and use polymorphic relationship on skills table under "required_skills"
+            // $table->json('required_experience')->nullable();
+
             $table->json('required_education')->nullable();
             $table->integer('resume_min_words')->default(450);
             $table->integer('resume_max_words')->default(850);
