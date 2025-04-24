@@ -48,6 +48,18 @@ return [
         'model' => env('OPENAI_MODEL', 'gpt-4o'),
     ],
 
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY_HIRE_GLUE'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-3-7-sonnet-20250219'),
+        'headers' => [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+            'x-api-key' => env('ANTHROPIC_API_KEY_HIRE_GLUE'),
+            'anthropic-version' => '2023-06-01',
+            'anthropic-beta' => implode(',', ['output-128k-2025-02-19', 'message-batches-2024-09-24']),
+        ]
+    ],
+
     'html_to_markdown' => [
         'api_key' => env('HTML_TO_MARKDOWN_API_KEY', '')
     ],
