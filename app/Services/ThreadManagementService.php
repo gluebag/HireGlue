@@ -283,15 +283,93 @@ EOT;
         }
 
         // Add skills
-        $profile .= "\n\n### Skills:\n";
+        $profile .= "\n\n";
+        $profile .= $this->formatSkillsBreakdown($user, $allSkillDetails);
 
-        // Add scale breakdown to the skills
-        $profile .= "\n  - **Proficiency Scale:**\n";
-        $profile .= "    - 1-2 (Novice): Basic theoretical knowledge, little to no practical experience.\n";
-        $profile .= "    - 3-4 (Beginner): Some hands-on experience, can handle simple tasks with guidance.\n";
-        $profile .= "    - 5-6 (Intermediate): Solid working knowledge, can work independently on moderately complex tasks.\n";
-        $profile .= "    - 7-8 (Advanced): Expert-level skills, can lead projects or solve complex problems.\n";
-        $profile .= "    - 9-10 (Master/Expert): World-class expertise, can innovate or teach others.\n";
+
+        // Add projects
+        $profile .= "\n\n### Projects:\n";
+        foreach ($user->projects as $project) {
+            $profile .= "- **{$project->name}**\n";
+            $profile .= "  {$project->description}\n";
+
+            // todo: USE and ADD new polymorphic skillable type mapping representation here:
+            // todo: -- **Skills Used:**\n
+            // todo: add years of experience here
+            // todo: add type of skill (enum('technical','soft','domain','tool','language','other'))
+            // todo: add proficiency reason string
+            // todo: add proficiency reason type enum('job_post_description','project','work','github','local_code','other')
+
+            if (!empty($project->technologies_used)) {
+                $techs = implode(", ", array_keys($project->technologies_used));
+                $profile .= "  **Technologies:** {$techs}\n";
+            }
+
+            if(!empty($project->achievements)) {
+                $profile .= "  **Achievements:**\n";
+                foreach ($project->achievements as $achievement) {
+                    $profile .= "    - {$achievement}\n";
+                }
+            }
+
+            if (!empty($project->url)) {
+                $profile .= "  **URL:** {$project->url}\n";
+            }
+        }
+
+        return $profile;
+    }
+
+    public function formatSkillsSimple(User $user, bool $withDetails = true) : string
+    {
+        $profile = "";
+        foreach ($user->skills()->orderBy('proficiency', 'desc')->get() as $skill) {
+            $proficiency = $skill->proficiency;
+
+            $proficiencyText = match ($proficiency) {
+                1, 2 => "Novice",
+                3, 4 => "Beginner",
+                5, 6 => "Intermediate",
+                7, 8 => "Advanced",
+                9, 10 => "Master/Expert",
+                default => "Unknown"
+            };
+            // todo: add years of experience here
+            // todo: add type of skill (enum('technical','soft','domain','tool','language','other'))
+            // todo: add proficiency reason type enum('job_post_description','project','work','github','local_code','other')
+
+            $profile .= "{$skill->name}: {$proficiencyText} ({$proficiency})";
+
+            if (!empty($skill->proficiency_reason) && $withDetails) {
+                $reason = $skill->proficiency_reason;
+                // convert newlines to spaces
+                $reason = preg_replace('/\s+/', ' ', $reason);
+                // remove any trailing spaces
+                $reason = rtrim($reason);
+                $profile .= " - {$reason}\n";
+
+            } else {
+                $profile .= "\n";
+            }
+        }
+
+        return $profile;
+    }
+
+    public function formatSkillsBreakdown(User $user, bool $withAllDetails = true, bool $withScale = true): string
+    {
+        // Add skills
+        $profile = "### Full List of Skills:\n";
+
+        if($withScale) {
+            // Add scale breakdown to the skills
+            $profile .= "\n  - **Proficiency Scale:**\n";
+            $profile .= "    - 1-2 (Novice): Basic theoretical knowledge, little to no practical experience.\n";
+            $profile .= "    - 3-4 (Beginner): Some hands-on experience, can handle simple tasks with guidance.\n";
+            $profile .= "    - 5-6 (Intermediate): Solid working knowledge, can work independently on moderately complex tasks.\n";
+            $profile .= "    - 7-8 (Advanced): Expert-level skills, can lead projects or solve complex problems.\n";
+            $profile .= "    - 9-10 (Master/Expert): World-class expertise, can innovate or teach others.\n";
+        }
 
         // Add the skills with proficiency levels, along with proficiency_reason underneath it if available and the score is 10
         $profile .= "\n  - **Breakdown:**\n";
@@ -314,10 +392,13 @@ EOT;
                 $profile .= "    - {$skill->name}: {$proficiencyText} ({$proficiency})\n";
             }
 
-            if (!empty($skill->proficiency_reason) && ($proficiency >= 10 || $allSkillDetails)) {
+            // todo: add years of experience here
+            // todo: add type of skill (enum('technical','soft','domain','tool','language','other'))
+            // todo: add proficiency reason type enum('job_post_description','project','work','github','local_code','other')
+
+            if (!empty($skill->proficiency_reason) && ($proficiency >= 10 || $withAllDetails)) {
                 $profile .= "      - **Details:** {$skill->proficiency_reason}\n";
             }
-
 
 //            $proficiencyReason = !empty($skill->proficiency_reason) ? " ({$skill->proficiency_reason})" : "";
 //            $experience = $skill->years_experience > 0 ? " ({$skill->years_experience} years)" : "";
@@ -328,29 +409,6 @@ EOT;
 //            $experience = $skill->years_experience > 0 ? " ({$skill->years_experience} years)" : "";
 //            $profile .= "- {$skill->name}{$experience}\n";
 //        }
-
-        // Add projects
-        $profile .= "\n\n### Projects:\n";
-        foreach ($user->projects as $project) {
-            $profile .= "- **{$project->name}**\n";
-            $profile .= "  {$project->description}\n";
-
-            if (!empty($project->technologies_used)) {
-                $techs = implode(", ", array_keys($project->technologies_used));
-                $profile .= "  **Technologies:** {$techs}\n";
-            }
-
-            if(!empty($project->achievements)) {
-                $profile .= "  **Achievements:**\n";
-                foreach ($project->achievements as $achievement) {
-                    $profile .= "    - {$achievement}\n";
-                }
-            }
-
-            if (!empty($project->url)) {
-                $profile .= "  **URL:** {$project->url}\n";
-            }
-        }
 
         return $profile;
     }
