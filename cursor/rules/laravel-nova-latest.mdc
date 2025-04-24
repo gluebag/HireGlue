@@ -1,6 +1,6 @@
 ---
 description: 
-globs: app/Nova/**/*.php
+globs: 
 alwaysApply: false
 ---
 

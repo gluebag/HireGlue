@@ -1,7 +1,7 @@
 ---
-description: HireGlue project-specific guidelines and patterns
-globs: **/*
-alwaysApply: true
+description: 
+globs: 
+alwaysApply: false
 ---
 
 # HireGlue Project Guidelines
