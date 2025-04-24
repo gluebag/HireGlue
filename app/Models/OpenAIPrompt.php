@@ -25,5 +25,12 @@ class OpenAIPrompt extends Model
         return $this->hasMany(PromptHistory::class, 'prompt_id');
     }
 
+    public function lastHistory() :\Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(PromptHistory::class, 'id', 'last_history_id');
+    }
+
+
+
 //    public function last
 }

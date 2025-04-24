@@ -28,11 +28,11 @@ class HtmlToMarkdownService
         if ($purifyFirst) {
             $htmlBefore = $html;
             $html = $this->purifyHtml($html, $baseUrl);
-            Log::debug(sprintf('HTML Purified - Length (Before: %s, After: %s)', number_format(strlen($htmlBefore)), number_format(strlen($html))), [
-                'original' => $htmlBefore,
-                'purified' => $html,
-                'baseUrl' => $baseUrl,
-            ]);
+//            Log::debug(sprintf('HTML Purified - Length (Before: %s, After: %s)', number_format(strlen($htmlBefore)), number_format(strlen($html))), [
+//                'original' => $htmlBefore,
+//                'purified' => $html,
+//                'baseUrl' => $baseUrl,
+//            ]);
         }
 
         // Use a library like `league/html-to-markdown` to convert HTML to Markdown
@@ -63,11 +63,11 @@ class HtmlToMarkdownService
         // remove empty lines
         $markdown = preg_replace('/^\s*$/m', '', $markdown);
 
-        Log::debug(sprintf('HTML to Markdown - Length (<html> Before: %s, <markdown> After: %s)', number_format(strlen($html)), number_format(strlen($markdown))), [
-            'original' => $html,
-            'markdown' => $markdown,
-            'baseUrl' => $baseUrl,
-        ]);
+//        Log::debug(sprintf('HTML to Markdown - Length (<html> Before: %s, <markdown> After: %s)', number_format(strlen($html)), number_format(strlen($markdown))), [
+//            'original' => $html,
+//            'markdown' => $markdown,
+//            'baseUrl' => $baseUrl,
+//        ]);
         return $markdown;
     }
 
@@ -95,7 +95,7 @@ class HtmlToMarkdownService
             'HTML.Doctype' => null,
             'HTML.SafeObject' => false,
             'HTML.TidyLevel' => 'heavy',
-            'URI.DisableExternalResources' => true,
+            'URI.DisableExternalResources' => false,
             'URI.Munge' => null,
             'AutoFormat.RemoveEmpty.Predicate' => 'colgroup:,th:,td:,iframe:src',
             'AutoFormat.RemoveEmpty' => true,
