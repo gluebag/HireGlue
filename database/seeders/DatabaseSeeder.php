@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
 
             SkillSeeder::class,
             EducationSeeder::class,
+            WorkExperienceSeeder::class,
         ]);
     }
 }
