@@ -1,7 +1,7 @@
 ---
-description: Guidelines for implementing the rules engine for resume and cover letter validation
-globs: app/Services/RuleEngine*.php
-alwaysApply: true
+description: 
+globs: 
+alwaysApply: false
 ---
 
 # Rules Engine Guidelines

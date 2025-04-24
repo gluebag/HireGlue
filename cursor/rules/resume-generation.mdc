@@ -1,7 +1,7 @@
 ---
-description: Guidelines for implementing resume and cover letter generation in HireGlue
-globs: app/Services/Resume*.php,app/Services/CoverLetter*.php
-alwaysApply: true
+description: 
+globs: 
+alwaysApply: false
 ---
 
 # Resume and Cover Letter Generation Guidelines

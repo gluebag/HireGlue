@@ -12,10 +12,12 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UserSeeder::class,
             RulesSeeder::class,
             OpenAIPromptsSeeder::class,
-            OpenAIPromptSeeder::class,
+            UserSeeder::class,
+
+            SkillSeeder::class,
+            EducationSeeder::class,
         ]);
     }
 }

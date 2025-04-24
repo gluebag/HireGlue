@@ -59,3 +59,17 @@ phpunit.xml
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
+# Project specific
+tests/TestCase.php
+tests/Feature/ExampleTest.php
+tests/Unit/RulesServiceTest.php
+tests/Unit/OpenAIServiceTest.php
+tests/Unit/GenerationServiceTest.php
+tests/Unit/ExampleTest.php
+tests/Unit/PDFServiceTest.php
+repomix-embeddings.md
+.env.example
+ray.php
+artisan
+import-data/

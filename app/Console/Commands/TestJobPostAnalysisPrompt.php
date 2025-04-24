@@ -129,7 +129,7 @@ class TestJobPostAnalysisPrompt extends Command
 
             $this->info('Required Skills: ' . count($parsedResult['required_skills'] ?? []));
             $this->info('Preferred Skills: ' . count($parsedResult['preferred_skills'] ?? []));
-            $this->info('Required Experience: ' . count($parsedResult['required_experience'] ?? []));
+//            $this->info('Required Experience: ' . count($parsedResult['required_experience'] ?? []));
             $this->info('Required Education: ' . count($parsedResult['required_education'] ?? []));
 
             if (isset($parsedResult['salary_range_min']) && isset($parsedResult['salary_range_max'])) {

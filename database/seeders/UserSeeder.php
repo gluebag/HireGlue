@@ -26,7 +26,5 @@ class UserSeeder extends Seeder
             'github_url' => 'https://github.com/gluebag',
             'personal_website_url' => 'https://attentiv.dev',
         ]);
-
-        // You can add more users if needed
     }
 }

@@ -1,7 +1,7 @@
 ---
-description: Guidelines for OpenAI API integration in the HireGlue project
-globs: app/Services/OpenAI*.php
-alwaysApply: true
+description: 
+globs: 
+alwaysApply: false
 ---
 
 # OpenAI Integration Guidelines
