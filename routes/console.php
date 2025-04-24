@@ -1,13 +1,383 @@
 <?php
 
+use App\Services\HtmlToMarkdownService;
+use App\Services\ThreadManagementService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+use Claude\Claude3Api\Client as ClaudeClient;
+use Claude\Claude3Api\Config as ClaudeConfig;
+use Claude\Claude3Api\Models\Message;
+use Claude\Claude3Api\Models\Content\TextContent;
+use Claude\Claude3Api\Requests\MessageRequest;
+use Claude\Claude3Api\Models\Content\ImageContent;
 
 Schedule::command('telescope:prune --hours=48')->daily();
 
 
-Artisan::command('htmltomd', function() {
+Artisan::command('test:claude-analyze {jobUrl?}', function () {
+
+    if(!$this->argument('jobUrl')) {
+        $this->error('Please provide a job URL');
+        return;
+    }
+    $jobUrl = $this->argument('jobUrl');
+//    $jobUrl = 'https://www.google.com/about/careers/applications/jobs/results/84398062939579078-senior-staff-partner-solutions-architect-google-cloud?location=Miami+UnitedStates&src=Online/Job+Board/glassdoor';
+
+    // fetch html from google job
+    $options = [
+        'verify' => false,
+        'proxy' => 'http://127.0.0.1:10001',
+    ];
+    $headers = [
+        'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:137.0) Gecko/20100101 Firefox/137.0',
+        'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language' => 'en-US,en;q=0.5',
+        'Referer' => 'https://www.google.com/about/careers/applications/jobs/results/',
+        'Cookie' => 'AEC=AVcja2flegBy2c8uJKLeWbCfQ6obs-cXIIb0KWLIfedfv5gLSuBbYEKbjew; NID=523=YT0Ll6nimqXKNqW4GdwsFIhsqQcM4j5mWK86ns21LGdhIA58PkdDbiaKXEep15V9oRoD5kPnuguqNSVouRfwU5tv4df3txNy1nytH4lNx4OD2FJnBU0MNrJVXm8E0KVaLS1qslTUcYlnXY0Pz4cxOdc1J1TH_k8LrAwWFFu3KeKoO3Gq4ysOiLWHpmsFHAroqdTYThkZTE9BsQd33FH9F238xpy1Cq0tDSi81-PVDVsKGrYgvbTX9f0GJ7cAu3n52klb8hoB7sqvdDusWDDQWnAilaqV-GPlmaHEvTC47z7GJqglAER396K84cvudXbFIxvy7DyVGuEhDWp8ZqNl2uY3vvvAAFdOJnv8SDh6qQcPmtgVBARuHvHOg3S4970rsZz_xdUF9YFY6SzydG_YI2dpUNyBA4Rr71ivDGeD5oy0w2p7VF2VjHoP4FxQWmkpSOpIjMq7P-OcyisN6SX4J02wpzOlohjIkigEbPeVW0QfcLQGKlQzrnSgT6fuY4N7RdfMKcP70gfpVj0bYT8o9sqnzI_8GyfAIs2SVR-D5qi0ZraVNcdHNYV9dcdJ5fyE-1Yb98LjcHHcT9PjCeP-Kfb6gi-fDXriqjt22a7txDTXNOTXMpU-F6pdgH8nMmlijQKcnytQlfJkXSLdUM5lyOIKwa0m8vAfTDG-esby0G93_vV4kqVrgE_2e3KDww1pxqb-36bxTLLdMjFnKxs6XoxDztk5hBpI0xRUk5o; SID=g.a000vgixh16fo-DawRjxA1ERLvL_qmG2Bf2CxPRQLzsAn7arutwoUalpGLfUFQHto5-hOXYthgACgYKAaASARMSFQHGX2MifYnqg1PmljD-_aAa5pIgUBoVAUF8yKowICpgcjnBE0Zp9pqYvd2i0076; __Secure-1PSID=g.a000vgixh16fo-DawRjxA1ERLvL_qmG2Bf2CxPRQLzsAn7arutwozOJVJNQQ6rQe530aa5rbOwACgYKAT4SARMSFQHGX2Mii8NtzM51CSdnNbu-9G8BKBoVAUF8yKpNIO3d9Wi3NZlryJItuqe-0076; __Secure-3PSID=g.a000vgixh16fo-DawRjxA1ERLvL_qmG2Bf2CxPRQLzsAn7arutwoTwS58CkQF0vFuts9UlyhFwACgYKAcASARMSFQHGX2MiP8Ll13zL-W24qeGwBzPRTRoVAUF8yKrSAvw5v9cCqyi7YDSxyBp20076; HSID=AGJwcprdwNv3J9Wu9; SSID=AX35EfxYohjRuR1ze; APISID=lCol4wHBBR7JvFDP/ACYXPhT15SEV2vYrj; SAPISID=7y5ybgXL9oFp9Efo/A_DpWH_tQ07OXR1U-; __Secure-1PAPISID=7y5ybgXL9oFp9Efo/A_DpWH_tQ07OXR1U-; __Secure-3PAPISID=7y5ybgXL9oFp9Efo/A_DpWH_tQ07OXR1U-; SIDCC=AKEyXzVmwvaP24Fs5Bw4M8ldPbH8rlOniAFXxBtaR5zIRZi2cIuPLYivJNJBKjH-fvGNgaLz; __Secure-1PSIDCC=AKEyXzW_BkviToIkEYamQ_10SyNtK1VrMOtCWU7KBDzCqY9KdGnw0IpCpmmlw4U7g209VCEp; __Secure-3PSIDCC=AKEyXzXZWNvxe1p7Pg6rA4Lre4c2q_z6rE9XEnd_VVV57ZDEJKEJY9-pzca5epopVjbNsOeP',
+        'Upgrade-Insecure-Requests' => '1',
+        'Sec-Fetch-Dest' => 'document',
+        'Sec-Fetch-Mode' => 'navigate',
+        'Sec-Fetch-Site' => 'none',
+        'Sec-Fetch-User' => '?1',
+        'Priority' => 'u=0, i'
+    ];
+    $resp = \Illuminate\Support\Facades\Http::withOptions($options)
+        ->withHeaders($headers)
+        ->get($jobUrl)
+        ->throw();
+    $htmlContent = $resp->body();
+
+    $findGoogleDiv = function ($html) {
+
+        $dom = new DOMDocument();
+
+        @$dom->loadHTML($html);
+
+        $xpath = new DOMXPath($dom);
+
+        $elements = $xpath->query('//div[@data-title]');
+
+        $foundParentForTitle = null;
+        $foundElement = null;
+
+        if ($elements->length > 0) {
+            // Loop through all found elements
+            foreach ($elements as $element) {
+                // Check if this element has any children
+                if ($element->hasChildNodes()) {
+                    // Get the first child element (skipping text nodes)
+                    $firstChild = $element->firstChild;
+
+                    // Skip text nodes and comments until we find the first element
+                    while ($firstChild !== null && !($firstChild instanceof DOMElement)) {
+                        $firstChild = $firstChild->nextSibling;
+                    }
+
+                    // Check if the first element child is an H1
+                    if ($firstChild !== null && strtolower($firstChild->nodeName) == 'h1') {
+                        $foundParentForTitle = $element;
+
+                        // get the first element that is a <main> element of the parent of the H1
+                        $mainElements = $xpath->query('.//main', $firstChild->parentNode);
+                        if ($mainElements->length > 0) {
+                            $foundElement = $mainElements->item(0);
+                            $this->line('Found <main> element');
+                            break; // Stop after finding the first match
+                        } else {
+                            throw new Exception("No <main> element found");
+                        }
+
+                    }
+                }
+            }
+
+            if ($foundElement !== null) {
+                // Get the outer HTML of the element
+                $outerHTML = $dom->saveHTML($foundElement);
+                $dataTitle = $foundParentForTitle->getAttribute('data-title');
+
+                $parts = [
+                    'html' => $outerHTML,
+                    'text' => $foundElement->textContent,
+                    'title' => $dataTitle,
+                    'company' => 'Google'
+                ];
+
+                if (\Illuminate\Support\Str::contains($dataTitle, ', Google')) {
+                    $parts['title'] = \Illuminate\Support\Str::before($dataTitle, ', Google');
+                    $parts['company'] = 'Google' . \Illuminate\Support\Str::after($dataTitle, ', Google');
+                }
+                return $parts;
+            } else {
+                throw new Exception("No div with data-title and H1 as first child found");
+            }
+        } else {
+            throw new Exception("No elements with data-title attribute found");
+        }
+    };
+    $parts = $findGoogleDiv($htmlContent);
+
+    $htmlContent = $parts['html'];
+    $jobTitle = $parts['title'];
+    $jobCompany = $parts['company'];
+
+    // convert to md
+    $markdownContent = app(HtmlToMarkdownService::class)->convert($htmlContent, true, $jobUrl);
+    // post-cleaning on md
+    $markdownContent = preg_replace('/\s*share\n/', '', $markdownContent); // replace "share" with empty string
+    $markdownContent = preg_replace('/\s*linkCopy linkemailEmail a friend\n/', '', $markdownContent); // replace "share" with empty string
+    $markdownContent = preg_replace('/\s*info_outline\n/', '', $markdownContent); // replace "share" with empty string
+
+
+    // get user skills breakdown
+    $user = App\Models\User::find(1);
+    $threadService = app(ThreadManagementService::class);
+    // $skillsBreakdown = $threadService->formatSkillsBreakdown($user, $withAllDetails = true, $withScale = false);
+    $skillsBreakdown = $threadService->formatSkillsSimple($user);
+
+    // load from model prompt and build it out with vars
+    $prompt = \App\Models\OpenAIPrompt::where('name', 'job_post_analysis_claude')->first();
+    $promptVariables = [
+        'job_content' => $markdownContent,
+        'company' => $jobCompany,
+        'target_role' => $jobTitle,
+        'my_skills' => $skillsBreakdown,
+    ];
+    $promptText = app(\App\Services\JobPostAIService::class)->replacePlaceholders($prompt->prompt_template, $promptVariables);
+
+    // build post data
+    $postData = [
+        'model' => 'claude-3-7-sonnet-20250219',
+        'max_tokens' => 128000,
+        'temperature' => 1,
+        'system' => $prompt->system_message,
+        'messages' => [
+            [
+                'role' => 'user',
+                'content' => []
+            ]
+        ],
+        'thinking' => [
+            'type' => 'enabled',
+            'budget_tokens' => 64000
+        ],
+    ];
+
+    // build user messages array
+    if (!empty($prompt->examples_message)) {
+        $postData['messages'][0]['content'][] = [
+            'type' => 'text',
+            'text' => $prompt->examples_message,
+            'cache_control' => [
+                'type' => 'ephemeral',
+            ]
+        ];
+    }
+    $postData['messages'][0]['content'][] = [
+        'type' => 'text',
+        'text' => $promptText,
+    ];
+
+
+    $claudeUrl = 'https://api.anthropic.com/v1/messages';
+
+//    // Do it in batches? so its async
+//    $requestId = "{$prompt->type}:{$prompt->id}" . \Illuminate\Support\Str::slug($prompt->name) . ":" . \Illuminate\Support\Str::random(8);
+//    $claudeUrl = 'https://api.anthropic.com/v1/messages/batches';
+//    $postData = [
+//        'requests' => [
+//            [
+//                'custom_id' => $requestId,
+//                'params' => $postData
+//            ]
+//        ]
+//    ];
+    // POST request to Claude
+    $startedAt = microtime(true);
+    $claudeResp = \Illuminate\Support\Facades\Http::withOptions($options)
+        ->withHeaders(config('services.anthropic.headers'))
+        ->timeout(300)
+        ->post($claudeUrl, $postData)
+        ->throw()
+        ->json();
+
+//    $batchId = $claudeResp['batch_id'];
+
+
+    // Handle the final response
+    $endedAt = microtime(true);
+    $elapsedTimeSecs = $endedAt - $startedAt;
+    $elapsedTimeSecs = round($elapsedTimeSecs);
+
+
+
+    $this->warn('Claude response time: ' . $elapsedTimeSecs . ' seconds');
+    $tokenStats = $claudeResp['usage'];
+
+// Store in prompt history
+    $historyItem = \App\Models\PromptHistory::create([
+        'prompt_id' => $prompt->id,
+        'user_id' => $user->id,
+        'type' => $prompt->type,
+        'name' => $prompt->name,
+        'status' => 'completed',
+        'src_class' => 'console.php',
+        'src_function' => 'php artisan test:claude-analyze',
+        'src_stack' => \Illuminate\Support\Str::after(debug_backtrace()[1]['function'], 'App\Console\Kernel->call()'),
+        // 'src_data' => json_encode($postData),
+        'tokens_used' => $tokenStats['input_tokens'] + $tokenStats['output_tokens'],
+        'elapsed_time' => $elapsedTimeSecs,
+        'api_response' => $claudeResp,
+        'model_config' => Arr::except($postData, ['messages', 'system']),
+        'system_message' => $prompt->system_message,
+        'user_messages' => $postData['messages'],
+    ]);
+
+
+    $analyzedJobJson = trim(collect($claudeResp['content'])->where('type', 'text')->join("\n\n"));
+    $thinkingText = trim(collect($claudeResp['content'])->where('type', 'thinking')->join("\n\n"));
+    Log::debug('Claude JSON Response', [
+        'response' => $analyzedJobJson,
+        'thinking' => $thinkingText,
+        'stats' => $tokenStats
+    ]);
+
+    // convert respopnse to json if thats all it is
+    if(!\Illuminate\Support\Str::startsWith($analyzedJobJson, '```json')) {
+        throw new Exception('Invalid response format. Expected JSON.');
+    }
+    $analyzedJobJson = \Illuminate\Support\Str::after($analyzedJobJson, '```json');
+    $analyzedJobJson = \Illuminate\Support\Str::before($analyzedJobJson, '```');
+    $analyzedJobJson = json_decode($analyzedJobJson, true);
+    if (!$analyzedJobJson || json_last_error() !== JSON_ERROR_NONE) {
+        Log::error('Invalid JSON response from Claude', [
+            'response' => $analyzedJobJson,
+            'error' => json_last_error_msg()
+        ]);
+
+        throw new Exception('Failed to parse Claude response: ' . json_last_error_msg());
+    }
+
+
+//
+//    $tokenStats = $claudeResp['usage'];
+//
+//    Log::debug('Claude JSON Response', [
+//        'response' => $analyzedJobJson,
+//        'stats' => $tokenStats
+//    ]);
+
+
+});
+
+Artisan::command('test:cover-letter', function() {
+
+});
+
+Artisan::command('with-sdk', function(){
+
+    // use SDK
+    // Create a configuration object with your API key
+    $config = new ClaudeConfig(
+        config('services.anthropic.api_key'),
+        ClaudeConfig::DEEPSEEK_API_VERSION,
+        ClaudeConfig::DEFAULT_BASE_URL,
+        config('services.anthropic.model', 'claude-3-7-sonnet-20250219'),
+        config('services.anthropic.max_tokens', 128000),
+        ClaudeConfig::DEFAULT_AUTH_TYPE,
+        ClaudeConfig::DEFAULT_MESSAGE_PATH,
+        ['output-128k-2025-02-19' => true]
+    );
+    $client = new ClaudeClient($config);
+    // modify client with reflection to set proxy on underlying httpclient which is guzzle...
+    $reflection = new \ReflectionClass($client);
+    $property = $reflection->getProperty('httpClient');
+    $property->setAccessible(true);
+    /** @var \GuzzleHttp\Client $httpClient */
+    $httpClient = $property->getValue($client);
+    $reflection2 = new \ReflectionClass($httpClient);
+    $property2 = $reflection2->getProperty('config');
+    $property2->setAccessible(true);
+    $httpConfig = $property2->getValue($httpClient);
+    // set proxy
+    $property2->setValue($httpClient, \Illuminate\Support\Arr::set($httpConfig, 'proxy', 'http://127.0.0.1:10001'));
+    $property2->setValue($httpClient, \Illuminate\Support\Arr::set($httpConfig, 'verify', false));
+
+
+    // Create a message request
+    $messageRequest = new MessageRequest();
+    $messageRequest->setTemperature(1);
+    $messageRequest->setMaxTokens(128000);
+    $messageRequest->setModel('claude-3-7-sonnet-20250219');
+//    $messageRequest->setMetadata()
+
+    // Set system message with cacheable content
+    $systemMessage = new Message('system', [
+        // Regular system instruction
+        // new TextContent("You are an AI assistant tasked with analyzing literary works."),
+        new TextContent($prompt->system_message),
+        // Large text to be cached (e.g., an entire book)
+        // TextContent::withEphemeralCache("<the entire contents of Pride and Prejudice>")
+        TextContent::withEphemeralCache($prompt->examples_message),
+    ]);
+    // Add the system message properly
+    $messageRequest->addSystemMessage($systemMessage);
+
+    // Add a user message
+//    if (!empty($prompt->examples_message)) {
+//        $messageRequest->addMessage(new Message('user', [
+//            TextContent::withEphemeralCache($prompt->examples_message)
+//        ]));
+//    }
+    $messageRequest->addMessage(new Message('user', [
+        new TextContent($promptText)
+    ]));
+
+    $analyzedJobJson = "";
+    $tokenStats = [
+        'input_tokens' => 0,
+        'output_tokens' => 0,
+        'cache_creation_input_tokens' => 0,
+        'cache_read_input_tokens' => 0,
+        'used_cache' => false,
+        'created_cache' => false,
+    ];
+    $startedAt = microtime(true);
+    $client->streamMessage($messageRequest, function ($chunk) use (&$analyzedJobJson, &$tokenStats) {
+        if ($chunk instanceof \Claude\Claude3Api\Responses\MessageResponse) {
+            // Handle complete message response
+            $response = $chunk;
+            $tokenStats['input_tokens'] = $response->getInputTokens();
+            $tokenStats['output_tokens'] = $response->getOutputTokens();
+            $tokenStats['cache_creation_input_tokens'] = $response->getCacheCreationInputTokens();
+            $tokenStats['cache_read_input_tokens'] = $response->getCacheReadInputTokens();
+            $tokenStats['used_cache'] = $response->usedCache();
+            $tokenStats['created_cache'] = $response->createdCache();
+
+            Log::debug('Claude Response', [
+                'response' => $response->getContent(),
+                'stats' => $tokenStats
+            ]);
+
+//            echo "Claude's response: " . $response->getContent()[0]['text'];
+        } elseif (is_array($chunk)) {
+            if(isset($chunk['delta']['text'])) {
+                if(\Illuminate\Support\Str::endsWith($chunk['delta']['text'], "\n")) {
+                    echo "[claude] >\t";
+                }
+                $analyzedJobJson .= $chunk['delta']['text'];
+            } else {
+                // Handle other types of chunks (e.g., metadata)
+                Log::debug('Claude Chunk', [
+                    'chunk' => $chunk
+                ]);
+            }
+        }
+    });
+});
+
+Artisan::command('htmltomd', function () {
 //    $baseUrl = 'https://www.kickresume.com/edit/14195435/analyze/';
 //    $html = <<<'HTML'
 //<div class="modal-content"><div class="AnalyticsDetailModal-module__section___s8Dj0tDoST"><div class="AnalyticsDetailModal-module__title-wrapper___qoJjxNoKZP"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" class="AnalyticsDetailModal-module__icon___yZqt8Aade5"><path d="M8 .533C3.886.533.533 3.886.533 8c0 4.114 3.353 7.467 7.467 7.467 4.114 0 7.467-3.353 7.467-7.467C15.467 3.886 12.114.533 8 .533Zm0 1.6A5.855 5.855 0 0 1 13.867 8 5.855 5.855 0 0 1 8 13.867 5.855 5.855 0 0 1 2.133 8 5.855 5.855 0 0 1 8 2.133Z"></path><path d="M8 4.533a.8.8 0 0 0-.8.801V8a.8.8 0 0 0 .8.8.8.8 0 0 0 .8-.8V5.334a.8.8 0 0 0-.8-.8Zm0 5.334a.8.8 0 0 0-.8.799.8.8 0 0 0 .8.8h.006a.8.8 0 0 0 .8-.8.8.8 0 0 0-.8-.799Z"></path></svg><h4>Oh no! Your skills section may need improvement.</h4><button class="btn btn-square btn-light CloseButton-module__absolute___aGAj002Mtj CloseButton-module__close-btn___6Ya56QG6fg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="CloseButton-module__close-icon___72Q-fQk34r"><path d="M17.535 5.299a.888.888 0 00-.611.26l-4.979 4.978-4.869-4.869a.888.888 0 00-.002 0 .888.888 0 00-.642-.26.888.888 0 00-.612.26.888.888 0 000 1.256l4.87 4.869-5.286 5.283a.888.888 0 000 1.256.888.888 0 001.256 0l5.285-5.285 5.395 5.394a.888.888 0 001.256 0 .888.888 0 000-1.255L13.2 11.79l4.979-4.979a.888.888 0 000-1.253.888.888 0 00-.645-.26z"></path></svg></button></div><div class="AnalyticsDetailModal-module__description___ih-q-DeW1V">Your skills section is either missing or it's nearly empty. In other words, your resume is missing one of its most important components. By adding more relevant skills to your resume, you will hugely increase your chances of getting invited to job interviews.</div></div><div class="AnalyticsDetailModal-module__section___s8Dj0tDoST AnalyticsDetailModal-module__suggestion-section___jbO6ys80w2"><h6 class="AnalyticsDetailModal-module__suggestion-main-title___ymlT-JKJUz"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" class="AnalyticsDetailModal-module__suggestion-title-icon___7SkZ108AyU"><path d="M7.5 0a7.5 7.5 0 100 15 7.5 7.5 0 000-15zm0 1.426a6.075 6.075 0 11-.002 12.15A6.075 6.075 0 017.5 1.425zm-.001 2.647a.713.713 0 000 1.426h.007a.713.713 0 000-1.426zm0 2.714a.713.713 0 00-.713.713v2.716a.713.713 0 001.425 0V7.5a.713.713 0 00-.712-.713z"></path></svg>How to improve</h6><div class="AnalyticsDetailModal-module__suggestion___RyhUOZZFBZ"><div class="AnalyticsDetailModal-module__suggestion-title___k1dUcFP39G">1. Include skills from the job post.</div><div class="AnalyticsDetailModal-module__description___ih-q-DeW1V">Take a look at the job post you're replying to and identify the most important skills mentioned there. Which ones do you have? Make sure to mention as many of those skills in your skills section. This will help you pass any ATS checks as well as get on the good side of most recruiters.</div></div><div class="AnalyticsDetailModal-module__suggestion___RyhUOZZFBZ"><div class="AnalyticsDetailModal-module__suggestion-title___k1dUcFP39G">2. Prioritize hard skills.</div><div class="AnalyticsDetailModal-module__description___ih-q-DeW1V">In your skills section, you should prioritize hard skills over soft skills. But what are hard skills? As a rule of thumb, hard skills are the skills that can be learned and taught, such as foreign languages or technical abilities.
@@ -69,133 +439,52 @@ Artisan::command('htmltomd', function() {
 //    <div class="apply-icon svelte-gwjsea"><svg viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.3623 0.0473633L12.423 6.10796L6.3623 12.1687L5.30161 11.108L9.55161 6.85796H0.612305V5.35796H9.55161L5.30161 1.10796L6.3623 0.0473633Z" fill="currentColor"></path></svg></div></div></span> <span class="icon-outer svelte-3j8joj"></span></button></div> <div class="css-7kb56q" style="display: var(--display);"><a role="link" class="css-1m99t89 button variant-outline full-width animate-when-inactive svelte-3j8joj" href="/careers/jobs" tabindex="0" data-dd-action-name="See all jobs button" style="--transform-rotation: 0;"><span class="text svelte-3j8joj">See all jobs</span> <span class="icon-outer svelte-3j8joj"></span></a></div></div></div></div></div></div></div> <div id="apply-form-content" role="tabpanel" aria-labelledby="apply-form" class="svelte-19ltyf0 hidden"><div class="twist-grid css-s0hqca svelte-6p5tao"><div class="grid-item css-1t8nci6 svelte-16yd68s"><div id="grnhse_app"></div></div></div></div></div>
 //HTML;
 
-    $baseUrl = 'https://chatgpt.com/g/g-p-67df7c5c6cfc8191885020cd3bb7a2f8-brickyard-estates-fb-ads/c/67ef1f77-2e28-8002-ae18-7b12e0af6cd6';
+    $baseUrl = 'https://www.linkedin.com/jobs/search/?currentJobId=4202640799&f_C=675562&originToLandingJobPostings=4202640799%2C4179644318&trk=d_flagship3_company';
     $html = <<<HTML
-<div jscontroller="iYVHDc" class="inherited-styles-for-exported-element div-DkhPwc" jsname="tIk9qd" data-id="135461046696452806" jsaction="A6AxKc:CXOOvf;">
-  <div class="div-sPeqm">
-    <h2 class="h2-p1N2lc">Customer Engineer II, Platform Engineering, Google Cloud</h2>
-    <div class="div-Fy5Tp">
-      <div class="div-EJNmWe-unique-1" jsname="OrKVr" jscontroller="H27hkd" jsaction="FzgWvd:RFVo1b;JIbuQc:yUMr8c(eEndy),Imfim(qXjuib)">
-        <div class="div-VfPpkd-xl07Ob-XxIAqe-OWXEXe-oYxtQd-e0JdFb-unique-1" jscontroller="wg1P6b" jsaction="JIbuQc:aj0Jcf(WjL7X); keydown:uYT2Vb(WjL7X);xDliB:oNPcuf;SM8mFd:li9Srb;iFFCZc:NSsOUb;Rld2oe:NSsOUb" jsshadow="">
-          <div jsname="WjL7X" jsslot="" class="undefined"><button class="button-VfPpkd-Bz112c-LgbsSe-yHy1rc-eT1oJ-mN1ivc-unique-1" jscontroller="soHxf" jsaction="click:cOuCgd; mousedown:UX7yZ; mouseup:lbsD7e; mouseenter:tfO1Yc; mouseleave:JywGue; touchstart:p6p2H; touchmove:FwuNnf; touchend:yfqBxc; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; contextmenu:mg9Pef;mlnRJb:fLiPzd;" data-idom-class="yHy1rc eT1oJ mN1ivc" aria-label="Share Customer Engineer II, Platform Engineering, Google Cloud" aria-expanded="false" aria-haspopup="menu">
-              <div jsname="s3Eaab" class="div-VfPpkd-Bz112c-Jh9lGc-unique-1"></div>
-              <div class="div-VfPpkd-Bz112c-J1Ukfc-LhBDec-unique-1"></div><i class="i-google-material-icons-notranslate-VfPpkd-kBDsod-unique-1" aria-hidden="true">share</i>
-            </button></div>
-          <div jsname="U0exHf" jsslot="" class="undefined">
-            <div class="div-VfPpkd-xl07Ob-XxIAqe-VfPpkd-xl07Ob-q6oraf-P77izf-unique-1" jscontroller="ywOR5c" jsaction="keydown:I481le;JIbuQc:j697N(rymPhb);XVaHYd:c9v4Fb(rymPhb);Oyo5M:b5fzT(rymPhb);DimkCe:TQSy7b(rymPhb);m0LGSd:fAWgXe(rymPhb);WAiFGd:kVJJuc(rymPhb);" data-is-hoisted="false" data-should-flip-corner-horizontally="false" data-stay-in-viewport="false" data-menu-uid="ucj-2">
-              <ul class="ul-VfPpkd-StrnGf-rymPhb-DMZ54e-unique-1" jsname="rymPhb" jscontroller="PHUIyb" jsaction="mouseleave:JywGue; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; keydown:I481le;" role="menu" tabindex="-1" aria-label="Share a job options" data-disable-idom="true"><span class="span-VfPpkd-BFbNVe-bF1uUb-NZp2ef-unique-1" aria-hidden="true"></span>
-                <li class="li-VfPpkd-StrnGf-rymPhb-ibnC6b-unique-1" jsaction=" keydown:RDtNu; keyup:JdS61c; click:o6ZaF; mousedown:teoBgf; mouseup:NZPHBc; mouseleave:xq3APb; touchstart:jJiBRc; touchmove:kZeBdd; touchend:VfAz8;focusin:MeMJlc; focusout:bkTmIf;mouseenter:SKyDAe; change:uOgbud;" role="menuitem" jsname="SbVnGf" tabindex="-1"><span class="span-VfPpkd-StrnGf-rymPhb-pZXsl-unique-1"></span><span class="span-VfPpkd-StrnGf-rymPhb-Zmlebc-LhBDec"></span><span class="span-VfPpkd-StrnGf-rymPhb-f7MjDc-unique-1"><i class="i-google-material-icons-notranslate-VfPpkd-kBDsod-unique-2" aria-hidden="true">link</i></span><span jsname="K4r5Ff" class="span-VfPpkd-StrnGf-rymPhb-b9t22c-unique-1">Copy link</span></li>
-                <li class="li-VfPpkd-StrnGf-rymPhb-ibnC6b-unique-2" jsaction=" keydown:RDtNu; keyup:JdS61c; click:o6ZaF; mousedown:teoBgf; mouseup:NZPHBc; mouseleave:xq3APb; touchstart:jJiBRc; touchmove:kZeBdd; touchend:VfAz8;focusin:MeMJlc; focusout:bkTmIf;mouseenter:SKyDAe; change:uOgbud;" role="menuitem" jsname="YXVnZ" tabindex="-1"><span class="span-VfPpkd-StrnGf-rymPhb-pZXsl-unique-2"></span><span class="span-VfPpkd-StrnGf-rymPhb-Zmlebc-LhBDec"></span><span class="span-VfPpkd-StrnGf-rymPhb-f7MjDc-unique-2"><i class="i-google-material-icons-notranslate-VfPpkd-kBDsod-unique-1" aria-hidden="true">email</i></span><span jsname="K4r5Ff" class="span-VfPpkd-StrnGf-rymPhb-b9t22c-unique-2">Email a friend</span></li>
-              </ul>
-            </div>
-          </div>
-        </div><button class="button-VfPpkd-Bz112c-LgbsSe-fzRBVc-tmJved-mN1ivc-unique-1" jscontroller="xzbRj" jsaction="click:cOuCgd; mousedown:UX7yZ; mouseup:lbsD7e; mouseenter:tfO1Yc; mouseleave:JywGue; touchstart:p6p2H; touchmove:FwuNnf; touchend:yfqBxc; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; contextmenu:mg9Pef;mlnRJb:fLiPzd;" data-idom-class="fzRBVc tmJved mN1ivc" jsname="eEndy" data-sync-idom-state="true" aria-label="Bookmark Customer Engineer II, Platform Engineering, Google Cloud" aria-pressed="false">
-          <div jsname="s3Eaab" class="div-VfPpkd-Bz112c-Jh9lGc-unique-2"></div>
-          <div class="div-VfPpkd-Bz112c-J1Ukfc-LhBDec-unique-2"></div><span class="span-style-1-unique-1" aria-hidden="true"><i class="i-style-1-unique-1" aria-hidden="true">bookmark</i></span><span class="span-material-icons-extended-VfPpkd-Bz112c-kBDsod-unique-1" aria-hidden="true"><i class="i-google-material-icons-notranslate-VfPpkd-kBDsod-unique-2" aria-hidden="true">bookmark_border</i></span>
-        </button>
-      </div>
-    </div>
-  </div>
-  <div class="div-op1BBf"><span class="span-RP7SMd-unique-1"><i class="i-style-2-unique-1" aria-hidden="true">corporate_fare</i><span class="undefined">Google</span></span><span class="span-pwO9Dc-vo5qdf"><i class="i-style-3-unique-2" aria-hidden="true">place</i><span class="span-r0wTof">Atlanta, GA, USA</span><span class="span-r0wTof-p3oCrc">; Reston, VA, USA</span><span class="span-BVHzed">; +7 more</span><span class="span-Z2gFhf">; +6 more</span></span><span class="span-RP7SMd-unique-2"><i class="i-style-2-unique-1" aria-hidden="true">laptop_windows</i><span class="undefined">Remote eligible</span></span>
-    <div class="undefined"><span class="span-VfPpkd-suEOdc-sM5MNb-OWXEXe-nzrxxc" data-is-tooltip-wrapper="true">
-        <div class="div-VfPpkd-dgl2Hf-ppHlrf-sM5MNb" data-is-touch-wrapper="true"><button class="button-style-1" jscontroller="soHxf" jsaction="click:cOuCgd; mousedown:UX7yZ; mouseup:lbsD7e; mouseenter:tfO1Yc; mouseleave:JywGue; touchstart:p6p2H; touchmove:FwuNnf; touchend:yfqBxc; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; contextmenu:mg9Pef;mlnRJb:fLiPzd;" data-disable-idom="true" data-tooltip-enabled="true" data-tooltip-is-rich="true" aria-describedby="i11" role="img" aria-label="Mid, Learn more about experience filters.">
-            <div class="div-VfPpkd-Jh9lGc-unique-1"></div>
-            <div class="div-VfPpkd-J1Ukfc-LhBDec"></div>
-            <div class="div-VfPpkd-RLmnJb"></div><i class="i-google-material-icons-notranslate-VfPpkd-kBDsod-unique-3" aria-hidden="true"><i class="i-style-4-unique-3" aria-hidden="true">bar_chart</i></i><span jsname="V67aGc" class="span-VfPpkd-vQzf8d"><span class="span-wVSTAb">Mid</span></span>
-          </button></div>
-        <div jsshadow="" jscontroller="HmEm0" jsaction="BfpAHf:TCTP9d;Nwyqre:DsZxZc; transitionend:e204de;" data-title-id-disregard="ucj-3" id="i11" class="div-style-1" aria-hidden="true" role="tooltip">
-          <div class="div-VfPpkd-z59Tgd-VfPpkd-z59Tgd-OiiCO" jsname="ebgt1d"><span class="span-VfPpkd-BFbNVe-bF1uUb-NZp2ef-unique-2" aria-hidden="true"></span>
-            <h2 class="h2-ucj-3-VfPpkd-MlC99b" id="ucj-3">Mid</h2>
-            <div jsslot="" class="div-VfPpkd-IqDDtd">Experience driving progress, solving problems, and mentoring more junior team members; deeper expertise and applied knowledge within relevant area.</div>
-          </div>
-        </div>
-      </span></div>
-  </div>
-  <div class="div-fe9XXb" jsaction="JIbuQc:lUErtb">
-    <div class="div-VfPpkd-dgl2Hf-ppHlrf-sM5MNb" data-is-touch-wrapper="true">
-      <div class="div-style-2" jscontroller="nKuFpb" jsaction="click:cOuCgd; mousedown:UX7yZ; mouseup:lbsD7e; mouseenter:tfO1Yc; mouseleave:JywGue; touchstart:p6p2H; touchmove:FwuNnf; touchend:yfqBxc; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; contextmenu:mg9Pef;mlnRJb:fLiPzd;" data-idom-class="nCP5yc AjY5Oe DuMIQc LQeN7 A7K2Fc">
-        <div class="div-VfPpkd-Jh9lGc-unique-2"></div><span jsname="V67aGc" class="span-VfPpkd-vQzf8d" aria-hidden="true">Apply</span><a class="a-style-1" href="https://www.google.com/about/careers/applications/jobs/results/135461046696452806-customer-engineer-ii-platform-engineering-google-cloud?location=Miami+UnitedStates&amp;src=https://www.google.com/about/careers/applications/jobs/results/135461046696452806-customer-engineer-ii-platform-engineering-google-cloud?location=Miami+UnitedStates&amp;src=Online/Job+Board/Online/Job+Board../apply?jobId=CiUAL2FckeePiy10NIvddpdaw-P5I0iZs6TbUDcpiB1dq9dXNIPGEjsAgOFyA6P0UwZ6SO51vna6eRidS2kvuI6a14p7OvyIDeI0KfgIk4x9P5hSUnwz9MPvZs9tXaJK9exuYw%3D%3D_V2&amp;loc=US&amp;title=Customer+Engineer+II&amp;location=Miami+UnitedStates&amp;src=Online/Job+Board/glassdoor%22 aria-label=" apply"="" id="apply-action-button" data-navigation="server" jsname="hSRGPd"></a>
-        <div class="div-VfPpkd-J1Ukfc-LhBDec"></div>
-      </div>
-    </div>
-    <div class="div-v77buc">
-      <div class="div-EJNmWe-unique-2" jsname="OrKVr" jscontroller="H27hkd" jsaction="FzgWvd:RFVo1b;JIbuQc:yUMr8c(eEndy),Imfim(qXjuib)">
-        <div class="div-VfPpkd-xl07Ob-XxIAqe-OWXEXe-oYxtQd-e0JdFb-unique-2" jscontroller="wg1P6b" jsaction="JIbuQc:aj0Jcf(WjL7X); keydown:uYT2Vb(WjL7X);xDliB:oNPcuf;SM8mFd:li9Srb;iFFCZc:NSsOUb;Rld2oe:NSsOUb" jsshadow="">
-          <div jsname="WjL7X" jsslot="" class="undefined"><button class="button-VfPpkd-Bz112c-LgbsSe-yHy1rc-eT1oJ-mN1ivc-unique-2" jscontroller="soHxf" jsaction="click:cOuCgd; mousedown:UX7yZ; mouseup:lbsD7e; mouseenter:tfO1Yc; mouseleave:JywGue; touchstart:p6p2H; touchmove:FwuNnf; touchend:yfqBxc; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; contextmenu:mg9Pef;mlnRJb:fLiPzd;" data-idom-class="yHy1rc eT1oJ mN1ivc" aria-label="Share Customer Engineer II, Platform Engineering, Google Cloud" aria-expanded="false" aria-haspopup="menu">
-              <div jsname="s3Eaab" class="div-VfPpkd-Bz112c-Jh9lGc-unique-3"></div>
-              <div class="div-VfPpkd-Bz112c-J1Ukfc-LhBDec-unique-1"></div><i class="i-google-material-icons-notranslate-VfPpkd-kBDsod-unique-1" aria-hidden="true">share</i>
-            </button></div>
-          <div jsname="U0exHf" jsslot="" class="undefined">
-            <div class="div-VfPpkd-xl07Ob-XxIAqe-VfPpkd-xl07Ob-q6oraf-P77izf-unique-2" jscontroller="ywOR5c" jsaction="keydown:I481le;JIbuQc:j697N(rymPhb);XVaHYd:c9v4Fb(rymPhb);Oyo5M:b5fzT(rymPhb);DimkCe:TQSy7b(rymPhb);m0LGSd:fAWgXe(rymPhb);WAiFGd:kVJJuc(rymPhb);" data-is-hoisted="false" data-should-flip-corner-horizontally="false" data-stay-in-viewport="false" data-menu-uid="ucj-4">
-              <ul class="ul-VfPpkd-StrnGf-rymPhb-DMZ54e-unique-2" jsname="rymPhb" jscontroller="PHUIyb" jsaction="mouseleave:JywGue; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; keydown:I481le;" role="menu" tabindex="-1" aria-label="Share a job options" data-disable-idom="true"><span class="span-VfPpkd-BFbNVe-bF1uUb-NZp2ef-unique-3" aria-hidden="true"></span>
-                <li class="li-VfPpkd-StrnGf-rymPhb-ibnC6b-unique-1" jsaction=" keydown:RDtNu; keyup:JdS61c; click:o6ZaF; mousedown:teoBgf; mouseup:NZPHBc; mouseleave:xq3APb; touchstart:jJiBRc; touchmove:kZeBdd; touchend:VfAz8;focusin:MeMJlc; focusout:bkTmIf;mouseenter:SKyDAe; change:uOgbud;" role="menuitem" jsname="SbVnGf" tabindex="-1"><span class="span-VfPpkd-StrnGf-rymPhb-pZXsl-unique-1"></span><span class="span-VfPpkd-StrnGf-rymPhb-Zmlebc-LhBDec"></span><span class="span-VfPpkd-StrnGf-rymPhb-f7MjDc-unique-1"><i class="i-google-material-icons-notranslate-VfPpkd-kBDsod-unique-2" aria-hidden="true">link</i></span><span jsname="K4r5Ff" class="span-VfPpkd-StrnGf-rymPhb-b9t22c-unique-1">Copy link</span></li>
-                <li class="li-VfPpkd-StrnGf-rymPhb-ibnC6b-unique-2" jsaction=" keydown:RDtNu; keyup:JdS61c; click:o6ZaF; mousedown:teoBgf; mouseup:NZPHBc; mouseleave:xq3APb; touchstart:jJiBRc; touchmove:kZeBdd; touchend:VfAz8;focusin:MeMJlc; focusout:bkTmIf;mouseenter:SKyDAe; change:uOgbud;" role="menuitem" jsname="YXVnZ" tabindex="-1"><span class="span-VfPpkd-StrnGf-rymPhb-pZXsl-unique-2"></span><span class="span-VfPpkd-StrnGf-rymPhb-Zmlebc-LhBDec"></span><span class="span-VfPpkd-StrnGf-rymPhb-f7MjDc-unique-2"><i class="i-google-material-icons-notranslate-VfPpkd-kBDsod-unique-1" aria-hidden="true">email</i></span><span jsname="K4r5Ff" class="span-VfPpkd-StrnGf-rymPhb-b9t22c-unique-2">Email a friend</span></li>
-              </ul>
-            </div>
-          </div>
-        </div><button class="button-VfPpkd-Bz112c-LgbsSe-fzRBVc-tmJved-mN1ivc-unique-2" jscontroller="xzbRj" jsaction="click:cOuCgd; mousedown:UX7yZ; mouseup:lbsD7e; mouseenter:tfO1Yc; mouseleave:JywGue; touchstart:p6p2H; touchmove:FwuNnf; touchend:yfqBxc; touchcancel:JMtRjd; focus:AHmuwe; blur:O22p3e; contextmenu:mg9Pef;mlnRJb:fLiPzd;" data-idom-class="fzRBVc tmJved mN1ivc" jsname="eEndy" data-sync-idom-state="true" aria-label="Bookmark Customer Engineer II, Platform Engineering, Google Cloud" aria-pressed="false">
-          <div jsname="s3Eaab" class="div-VfPpkd-Bz112c-Jh9lGc-unique-4"></div>
-          <div class="div-VfPpkd-Bz112c-J1Ukfc-LhBDec-unique-2"></div><span class="span-style-2-unique-2" aria-hidden="true"><i class="i-style-5-unique-2" aria-hidden="true">bookmark</i></span><span class="span-material-icons-extended-VfPpkd-Bz112c-kBDsod-unique-2" aria-hidden="true"><i class="i-google-material-icons-notranslate-VfPpkd-kBDsod-unique-2" aria-hidden="true">bookmark_border</i></span>
-        </button>
-      </div>
-    </div>
-  </div>
-  <div class="div-KwJkGe">
-    <div role="none" class="div-xbCN0b-KiNied-M0TuQ-LlMNQd" data-announce-callout="true" data-liveregiontext="Info Note: Google’s hybrid workplace includes remote and in-office roles. By applying to this position you will have an opportunity to share your preferred working location from the following:
+<div class="grid-item css-q50dz svelte-16yd68s"><div id="job-details-content" role="tabpanel" aria-labelledby="job-details" class="svelte-19ltyf0"><div class="css-1u7p4gj svelte-1a3oq8x" data-testid="job-about"><p>Block is one company built from many blocks, all united by the same purpose of economic empowerment. The blocks that form our foundational teams — People, Finance, Counsel, Hardware, Information Security, Platform Infrastructure Engineering, and more — provide support and guidance at the corporate level. They work across business groups and around the globe, spanning time zones and disciplines to develop inclusive People policies, forecast finances, give legal counsel, safeguard systems, nurture new initiatives, and more. Every challenge creates possibilities, and we need different perspectives to see them all. Bring yours to Block.</p>
+<h3>The Role</h3>
+<p>Proto is accelerating the world's transition to an open economy with products that increase access and independence for everyone. We're building Proto, hardware and software to help decentralize bitcoin mining and promote innovative use cases for bitcoin mining. We're developing these products in the open - you can read more about them at <a href="http://mining.build" target="_blank">mining.build</a>. Within Proto, our Bitcoin Products team delivers the product and go-to-market strategy, software, firmware, and custom silicon needed to make Bitkey and our mining initiatives a reality. Come build the future of money with us!</p>
+<p>The Proto software team is a newly formed team responsible for prototyping, designing, and delivering software applications to support Block's custom Bitcoin mining chip. We work with the ASIC and Electrical Engineering teams to redefine what Bitcoin mining is.</p>
+<p>As the team is small, you will be responsible for all aspects of software development, which includes building, testing, and deploying on both bare metal embedded and Linux environments.</p>
+<p>We are a small, dynamic team with an abundance of growth and opportunities to make an impact!</p>
+<h3>You Will</h3>
+<ul>
+<li>Work with the team to help develop features; debug and guide engineers through problems</li>
+<li>Participate in reviewing and finalizing technical decisions</li>
+<li>Be responsible for the technical architecture of features that go into our products</li>
+<li>Scope and evaluate new technologies/architectures/practices to solve new problems on our roadmap</li>
+<li>Champion and define team best practices</li>
+<li>Mentor other senior engineers or managers on strategy, collaboration, influence, execution, and other aspects of leadership</li>
+<li>Partner with stakeholders to ensure technical execution meets expectations.</li>
+</ul>
+<h3>You Have</h3>
+<ul>
+<li>8+ years of relevant professional experience.</li>
+<li>Experience using Python in automated testing, build systems, or device firmware communication</li>
+<li>Proficiency in embedded programming languages like C, C++ or Rust,</li>
+<li>Experience with embedded systems, knowledge of operating systems, familiarity with software development tools, understanding of hardware-software interfaces</li>
+<li>Experience with application development on Linux or Unix</li>
+</ul>
+<h3>Preferred:</h3>
+<ul>
+<li>Knowledge of Bitcoin mining</li>
+<li>Experience working in Rust</li>
+<li>Experience in multi-threaded programming</li>
+<li>Experience working in Web development (HTML, Java Script, CSS, Node.js, CGI)</li>
+<li>Experience using Python (or similar scripting languages) in automated testing, build systems, or device firmware communication</li>
+<li>Understanding of common communications protocols (e.g. Ethernet, SPI, UART, I2C, USB), debugging practices (e.g. JTAG and associated GDB integrations), and basic electrical design principles</li>
+<li>Degree in CS, CE, EE, or equivalent practical experience</li>
+</ul>
+<p>We're working to build a more inclusive economy where our customers have equal access to opportunity, and we strive to live by these same values in building our workplace. Block is an equal opportunity employer evaluating all employees and job applicants without regard to identity or any legally protected class. We will consider qualified applicants with arrest or conviction records for employment in accordance with state and local laws and "fair chance" ordinances.</p>
+<p>We believe in being fair, and are committed to an inclusive interview experience, including providing reasonable accommodations to disabled applicants throughout the recruitment process. We encourage applicants to share any needed accommodations with their recruiter, who will treat these requests as confidentially as possible. <strong>Want to learn more about what we're doing to build a workplace that is fair and square? Check out our</strong> <a href="https://block.xyz/news/inclusion" target="_blank">I+D page</a>.</p>
+<p>While there is no specific deadline to apply for this role, U.S. roles are typically open for an average of 55 days before being filled by a successful candidate. Please refer to the date listed at the top of this job page for when this role was first posted.</p><div class="content-pay-transparency"><div class="pay-input"><div class="description"><p>&nbsp;</p>
+<p>Block takes a market-based approach to pay, and pay may vary depending on your location. U.S. locations are categorized into one of four zones based on a cost of labor index for that geographic area. The successful candidate’s starting pay will be determined based on job-related skills, experience, qualifications, work location, and market conditions. These ranges may be modified in the future.</p>
+<p>To find a location’s zone designation, please refer to this&nbsp;<a href="https://block.xyz/documents/salaryzones.pdf" target="_blank">resource</a>. If a location of interest is not listed, please speak with a recruiter for additional information.&nbsp;</p>
+<p>&nbsp;</p></div><div class="title">Zone A:</div><div class="pay-range"><span>$217,800</span><span class="divider">—</span><span>$326,800 USD</span></div></div><div class="pay-input"><div class="title">Zone B: </div><div class="pay-range"><span>$207,000</span><span class="divider">—</span><span>$310,400 USD</span></div></div><div class="pay-input"><div class="title">Zone C:</div><div class="pay-range"><span>$196,100</span><span class="divider">—</span><span>$294,100 USD</span></div></div><div class="pay-input"><div class="title">Zone D:</div><div class="pay-range"><span>$185,200</span><span class="divider">—</span><span>$277,800 USD</span></div></div></div><div class="content-conclusion"><p><em data-stringify-type="italic">Every benefit we offer is designed with one goal: empowering you to do the best work of your career while building the life you want. Remote work, medical insurance, flexible time off, retirement savings plans, and modern family planning are just some of our offering.&nbsp;</em><em data-stringify-type="italic"><a class="c-link c-link--underline" href="https://block.xyz/documents/benefits.pdf" target="_blank" data-stringify-link="https://block.xyz/documents/benefits.pdf" data-sk="tooltip_parent">Check out our other benefits at Block.</a></em></p>
+<p><em>Block, Inc. (NYSE: XYZ) builds technology to increase access to the global economy. Each of our brands unlocks different aspects of the economy for more people.&nbsp;<strong data-stringify-type="bold">Square</strong>&nbsp;makes commerce and financial services accessible to sellers.&nbsp;<strong data-stringify-type="bold">Cash App</strong>&nbsp;is the easy way to spend, send, and store money.&nbsp;<strong data-stringify-type="bold">Afterpay</strong>&nbsp;is transforming the way customers manage their spending over time.&nbsp;<strong data-stringify-type="bold">TIDAL</strong>&nbsp;is a music platform that empowers artists to thrive as entrepreneurs.&nbsp;<strong data-stringify-type="bold">Bitkey</strong>&nbsp;is a simple self-custody wallet built for bitcoin.&nbsp;<strong data-stringify-type="bold">Proto</strong>&nbsp;is a suite of bitcoin mining products and services. Together, we’re helping build a financial system that is open to everyone.</em></p>
+<p><a href="https://block.xyz/en/legal/applicant-privacy-notice" target="_blank">Privacy Policy</a></p></div></div> <div style="--theme-button-primary-button-default-background-color: #FF5B00;--theme-button-primary-button-default-foreground-color: black;--theme-button-primary-button-hover-focus-background-color: black;--theme-button-primary-button-hover-focus-foreground-color: white;--theme-button-primary-button-active-background-color: black;--theme-button-primary-button-active-foreground-color: white;--theme-button-secondary-button-default-background-color: #fff;--theme-button-secondary-button-default-foreground-color: #000;--theme-button-secondary-button-default-border-color: #FF5B00;--theme-button-secondary-button-hover-focus-background-color: #FF5B00;--theme-button-secondary-button-hover-focus-foreground-color: black;--theme-button-secondary-button-hover-focus-border-color: #FF5B00;--theme-button-secondary-button-active-background-color: #FF5B00;--theme-button-secondary-button-active-foreground-color: black;--theme-button-secondary-button-active-border-color: #FF5B00;--theme-brand-color: #FF5B00;--theme-bu-marquee-brand-color: #FF5B00;--theme-job-content-brand-color: #FF5B00;--theme-job-location-color: black;"><div class="css-h87lbp" style="display: var(--display);margin-top: var(--margin-top);"><div class="twist-stack css-174wxox svelte-qipevy" data-component="TwistStack"><div class="css-7kb56q" style="display: var(--display);"><button role="button" class="css-1m99t89 button variant-fill full-width animate-when-inactive svelte-3j8joj" style="--transform-rotation: -80.72795103723564;" tabindex="0" data-dd-action-name="Apply button"><span class="text svelte-3j8joj"><div class="css-16u7kps apply-text svelte-gwjsea">Apply
 
-In-office locations: Atlanta, GA, USA; Reston, VA, USA; Addison, TX, USA.
-Remote location(s): Florida, USA; North Carolina, USA; South Carolina, USA; Texas, USA; Virginia, USA." jscontroller="u3jeub" jsaction="rcuQ6b:rcuQ6b;">
-      <div class="div-OJgC7b">
-        <div class="div-quEfK" role="img" aria-label="Info"><i class="i-google-material-icons-notranslate-Auu9lc" aria-hidden="true">info_outline</i></div><span aria-hidden="true" jsname="arU4oc" class="span-v7dlUb-unique-1">X</span><span role="status" aria-live="polite" jsname="yW4uId" class="span-v7dlUb-unique-2">Info Note: Google’s hybrid workplace includes remote and in-office roles. By applying to this position you will have an opportunity to share your preferred working location from the following:
-
-          In-office locations: Atlanta, GA, USA; Reston, VA, USA; Addison, TX, USA.
-          Remote location(s): Florida, USA; North Carolina, USA; South Carolina, USA; Texas, USA; Virginia, USA.</span><span jsname="MyVLbf" class="span-MyVLbf">Note: Google’s hybrid workplace includes remote and in-office roles. By applying to this position you will have an opportunity to share your preferred working location from the following:<br class="css-scan-br-variation-1"><br class="css-scan-br-variation-1"><b class="css-scan-b-variation-2">In-office locations: Atlanta, GA, USA; Reston, VA, USA; Addison, TX, USA.</b><br class="css-scan-br-variation-1"><b class="css-scan-b-variation-2">Remote location(s): Florida, USA; North Carolina, USA; South Carolina, USA; Texas, USA; Virginia, USA.</b></span>
-      </div><span role="none" class="span-GMWBfb-NOIZeb"><span role="none" class="span-gdNP2" jsname="gdNP2"></span></span>
-    </div><br class="undefined">
-    <h3 class="css-scan-h3-variation-3">Minimum qualifications:</h3>
-    <ul class="css-scan-ul-variation-4">
-      <li class="css-scan-li-variation-5">Bachelor's degree or equivalent practical experience.</li>
-      <li class="css-scan-li-variation-6">6 years of experience with cloud native architecture in a customer-facing or support role.</li>
-      <li class="css-scan-li-variation-5">Experience with cloud engineering, on-premise engineering, virtualization, or containerization platforms.</li>
-      <li class="css-scan-li-variation-6">Experience engaging with, and presenting to, technical stakeholders and executive leaders.</li>
-      <li class="css-scan-li-variation-5">Ability to travel up to 20% of the time as needed.</li>
-    </ul><br class="undefined">
-    <h3 class="css-scan-h3-variation-7">Preferred qualifications:</h3>
-    <ul class="css-scan-ul-variation-8">
-      <li class="css-scan-li-variation-6">Experience in migrating applications and services to cloud platforms.</li>
-      <li class="css-scan-li-variation-5">Experience with "Big Data" technologies or concepts, such as analytics warehousing, data processing, data transformation, data governance, data migrations, ETL, ELT, SQL, NoSQL, performance or scalability optimizations, or batch versus streaming.</li>
-      <li class="css-scan-li-variation-6">Experience in developing cloud-native architectures for data warehousing, data lakes, real-time event processing, streaming, data migrations, data visualization tools, and ensuring data governance.</li>
-      <li class="css-scan-li-variation-5">Experience with security concepts such as encryption, identity management, access control, attack vectors, and pen testing.</li>
-      <li class="css-scan-li-variation-6">Experience prospecting, building, and maintaining customer relationships, with an interest for building out Greenfield territories.</li>
-    </ul>
-  </div>
-  <div class="div-aG5W3">
-    <h3 class="css-scan-h3-variation-9">About the job</h3>
-    <p class="css-scan-p-variation-10">When leading companies choose Google Cloud, it's a huge win for spreading the power of cloud computing globally. Once educational institutions, government agencies, and other businesses sign on to use Google Cloud products, you come in to facilitate making their work more productive, mobile, and collaborative. You deliver what is most helpful for the customer. You assist fellow sales Googlers by problem-solving key technical issues for our customers. You liaise with the product marketing management and engineering teams to stay on top of industry trends and devise enhancements to Google Cloud products. <br class="undefined"><br class="undefined">As a Customer Engineer, you will partner with technical Sales teams to differentiate Google Cloud to our customers. You will help prospective and existing customers and partners understand the power of Google Cloud, develop creative cloud solutions and architectures to solve their business challenges, engage in proofs-of-concepts, and troubleshoot any technical questions and roadblocks. You will use your expertise and presentation skills to engage with customers to understand their business and technical requirements, and persuasively present practical and useful solutions on Google Cloud. You will have excellent technical, communication and organizational skills.<br class="undefined"><br class="undefined">You will focus on a range of customer opportunities as a technical generalist, spanning infrastructure modernization, application modernization, data analytics and more. You will have a passion for building new relationships, with experience in prospecting and building out greenfield territories.</p>Google Cloud accelerates every organization’s ability to digitally transform its business and industry. We deliver enterprise-grade solutions that leverage Google’s cutting-edge technology, and tools that help developers build more sustainably. Customers in more than 200 countries and territories turn to Google Cloud as their trusted partner to enable growth and solve their most critical business problems.<div class="undefined"><br class="undefined"></div>
-    <div class="undefined">The US base salary range for this full-time position is $125,000-$183,000 + bonus + equity + benefits. Our salary ranges are determined by role, level, and location. Within the range, individual pay is determined by work location and additional factors, including job-related skills, experience, and relevant education or training. Your recruiter can share more about the specific salary range for your preferred location during the hiring process.</div>
-    <div class="undefined"><br class="undefined"></div>
-    <div class="undefined">Please note that the compensation details listed in US role postings reflect the base salary only, and do not include bonus, equity, or benefits. Learn more about <a href="https://careers.google.com/benefits/" class="css-scan-a-variation-11">benefits at Google</a>. </div>
-  </div>
-  <div class="div-BDNOWe">
-    <h3 class="css-scan-h3-variation-12">Responsibilities</h3>
-    <ul class="css-scan-ul-variation-13">
-      <li class="css-scan-li-variation-14">Work with the team to identify and qualify business opportunities, understand key customer technical objections, and develop the strategy to resolve technical blockers.</li>
-      <li class="css-scan-li-variation-15">Share in-depth Google Cloud expertise to support the technical relationship with customers, including technology advocacy, supporting bid responses, product and solution briefings, proof-of-concept work, and partnering directly with product management to prioritize solutions impacting customer adoption to Google Cloud.</li>
-      <li class="css-scan-li-variation-14">Work directly with Google Cloud products to demonstrate and prototype integrations in customer and partner environments.</li>
-      <li class="css-scan-li-variation-15">Recommend integration strategies, enterprise architectures, platforms, and application infrastructure required to successfully implement a complete solution on Google Cloud.</li>
-      <li class="css-scan-li-variation-14">Lead prospecting and acquisition of new logos, creating and building customer relationships from scratch, and establishing yourself as a trusted advisor on their long-term technology and business decisions.</li>
-    </ul>
-  </div>
-  <div class="div-bE3reb">
-    <div class="div-XS9rpb">
-      <p class="p-ciFk0-unique-1">Information collected and processed as part of your Google Careers profile, and any job applications you choose to submit is subject to Google's <a href="https://www.google.com/about/careers/applications/jobs/results/135461046696452806-customer-engineer-ii-platform-engineering-google-cloud?location=Miami+UnitedStates&amp;src=https://www.google.com/about/careers/applications/jobs/results/135461046696452806-customer-engineer-ii-platform-engineering-google-cloud?location=Miami+UnitedStates&amp;src=Online/Job+Board/Online/Job+Board../privacy-policy%22 class=" targeting-for-doc-to-parse-css-scan-a-variation-16"="">Applicant and Candidate Privacy Policy</a>.</p>
-      <p class="p-ciFk0-unique-2">Google is proud to be an equal opportunity and affirmative action employer. We are committed to building a workforce that is representative of the users we serve, creating a culture of belonging, and providing an equal employment opportunity regardless of race, creed, color, religion, gender, sexual orientation, gender identity/expression, national origin, disability, age, genetic information, veteran status, marital status, pregnancy or related condition (including breastfeeding), expecting or parents-to-be, criminal histories consistent with legal requirements, or any other basis protected by law. See also <a href="https://www.google.com/about/careers/applications/eeo/" class="css-scan-a-variation-17"> Google's EEO Policy</a>, <a href="https://careers.google.com/jobs/dist/legal/EEOC_KnowYourRights_10_20.pdf" class="css-scan-a-variation-16">Know your rights: workplace discrimination is illegal</a>, <a href="https://about.google/belonging/" class="css-scan-a-variation-17">Belonging at Google</a>, and <a href="https://careers.google.com/how-we-hire/" class="css-scan-a-variation-16">How we hire</a>.</p>
-      <p class="p-ciFk0-unique-1">If you have a need that requires accommodation, please let us know by completing our <a href="https://goo.gl/forms/aBt6Pu71i1kzpLHe2" class="css-scan-a-variation-17">Accommodations for Applicants form</a>.</p>
-      <p class="p-ciFk0-unique-2">Google is a global company and, in order to facilitate efficient collaboration and communication globally, English proficiency is a requirement for all roles unless stated otherwise in the job posting.</p>
-      <p class="p-ciFk0-unique-1">To all recruitment agencies: Google does not accept agency resumes. Please do not forward resumes to our jobs alias, Google employees, or any other organization location. Google is not responsible for any fees related to unsolicited resumes.</p>
-    </div>
-  </div>
-</div>
+    <div class="apply-icon svelte-gwjsea"><svg viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.3623 0.0473633L12.423 6.10796L6.3623 12.1687L5.30161 11.108L9.55161 6.85796H0.612305V5.35796H9.55161L5.30161 1.10796L6.3623 0.0473633Z" fill="currentColor"></path></svg></div></div></span> <span class="icon-outer svelte-3j8joj"></span></button></div> <div class="css-7kb56q" style="display: var(--display);"><a role="link" class="css-1m99t89 button variant-outline full-width animate-when-inactive svelte-3j8joj" style="--transform-rotation: 0;" href="/careers/jobs" tabindex="0" data-dd-action-name="See all jobs button"><span class="text svelte-3j8joj">See all jobs</span> <span class="icon-outer svelte-3j8joj"></span></a></div></div></div></div></div></div>
 HTML;
 
 
@@ -205,7 +494,7 @@ HTML;
 })->purpose('Convert HTML to Markdown');
 
 
-Artisan::command('test:generate-cover-letter {jobid}', function() {
+Artisan::command('test:generate-cover-letter {jobid}', function () {
     $jobId = $this->argument('jobid');
     $job = \App\Models\JobPost::find($jobId);
     if (!$job) {
