@@ -23,6 +23,10 @@ return new class extends Migration {
                 ->nullable()
                 ->comment('Type of skill. Technical, Soft Skill, Domain Knowledge, Tool/Software, Language, Other');
 
+            $table->enum('requirement_type', ['ideal', 'preferred', 'required'])
+                ->nullable()
+                ->comment('Requirement type for imported job post skills: ideal, preferred, required');
+
             $table->integer('years_experience')->nullable()
                 ->comment('Estimated years of experience in this skill');
 
