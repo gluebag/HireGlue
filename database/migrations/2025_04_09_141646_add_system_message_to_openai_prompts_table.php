@@ -27,8 +27,8 @@ return new class extends Migration
     {
         Schema::table('openai_prompts', function (Blueprint $table) {
             // drop FULL_TEXT index from system_message column and prompt_template column
-            $table->dropFullText('system_message');
-            $table->dropFullText('prompt_template');
+//            $table->dropFullText('system_message');
+//            $table->dropFullText('prompt_template');
             $table->dropColumn('system_message');
         });
     }

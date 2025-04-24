@@ -11,7 +11,6 @@ return new class extends Migration
      */
     public function up(): void
     {
-
         Schema::table('education', function (Blueprint $table) {
             if(!Schema::hasIndex('education', ['user_id', 'institution', 'degree'], 'unique')) {
                 $table->unique(['user_id', 'institution', 'degree']);
@@ -42,18 +41,11 @@ return new class extends Migration
             }
         });
 
-        Schema::table('skills', function (Blueprint $table) {
-            if(!Schema::hasIndex('skills', ['user_id', 'name'], 'unique')) {
-                $table->unique(['user_id', 'name']);
-            }
-        });
-
         Schema::table('work_experiences', function (Blueprint $table) {
             if(!Schema::hasIndex('work_experiences', ['user_id', 'company_name', 'position'], 'unique')) {
                 $table->unique(['user_id', 'company_name', 'position']);
             }
         });
-
     }
 
     /**
@@ -61,32 +53,34 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('education', function (Blueprint $table) {
-            $table->dropUnique(['user_id', 'institution', 'degree']);
-        });
+        // ignore foreign key constraints
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+//
+//        Schema::table('education', function (Blueprint $table) {
+//            $table->dropUnique(['user_id', 'institution', 'degree']);
+//        });
+//
+//        Schema::table('job_posts', function (Blueprint $table) {
+//            $table->dropUnique(['user_id', 'company_name', 'job_title']);
+//        });
+//
+//        Schema::table('openai_prompts', function (Blueprint $table) {
+//            $table->dropUnique(['name', 'type']);
+//        });
+//
+//        Schema::table('projects', function (Blueprint $table) {
+//            $table->dropUnique(['user_id', 'name']);
+//        });
+//
+//        Schema::table('rules', function (Blueprint $table) {
+//            $table->dropUnique(['name', 'type']);
+//        });
+//
+//        Schema::table('work_experiences', function (Blueprint $table) {
+//            $table->dropUnique(['user_id', 'company_name', 'position']);
+//        });
 
-        Schema::table('job_posts', function (Blueprint $table) {
-            $table->dropUnique(['user_id', 'company_name', 'job_title']);
-        });
-
-        Schema::table('openai_prompts', function (Blueprint $table) {
-            $table->dropUnique(['name', 'type']);
-        });
-
-        Schema::table('projects', function (Blueprint $table) {
-            $table->dropUnique(['user_id', 'name']);
-        });
-
-        Schema::table('rules', function (Blueprint $table) {
-            $table->dropUnique(['name', 'type']);
-        });
-
-        Schema::table('skills', function (Blueprint $table) {
-            $table->dropUnique(['user_id', 'name']);
-        });
-
-        Schema::table('work_experiences', function (Blueprint $table) {
-            $table->dropUnique(['user_id', 'company_name', 'position']);
-        });
+        // re-enable foreign key constraints
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
     }
 };
